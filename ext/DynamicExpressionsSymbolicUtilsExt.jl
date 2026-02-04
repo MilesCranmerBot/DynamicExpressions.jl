@@ -405,8 +405,15 @@ function multiply_powers(
         r, complete2 = multiply_powers(args[2])
         @return_on_false complete2 eqn
         @return_on_false is_valid(r) eqn
-        # SymbolicUtils v4 normalizes `x*x` into `x^2` via the `*` method; preserve
-        # explicit multiplication terms so we don't introduce `^` during conversion.
+        # NOTE: SymbolicUtils v4 may canonicalize `x*x` into `x^2` when you build
+        # products via the `*` method.
+        #
+        # During SymbolicUtils → DynamicExpressions conversion we intentionally preserve
+        # explicit multiplication terms so we:
+        #   1) don't introduce `^` unless it was present in the original expression
+        #      (DynamicExpressions operator sets may not include `^`), and
+        #   2) keep the round-trip structure stable/deterministic (DE tree equality is
+        #      structural/order-sensitive).
         if op == *
             return term(op, l, r), true
         end
