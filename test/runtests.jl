@@ -30,14 +30,18 @@ if "jet" in test_name
                 JET.test_package(
                     DynamicExpressions;
                     target_modules=(DynamicExpressions,),
-                    ignored_modules=(DynamicExpressions.NonDifferentiableDeclarationsModule,),
+                    ignored_modules=(
+                        DynamicExpressions.NonDifferentiableDeclarationsModule,
+                    ),
                 )
             catch err
                 if err isa MethodError
                     JET.test_package(
                         DynamicExpressions;
                         target_defined_modules=true,
-                        ignored_modules=(DynamicExpressions.NonDifferentiableDeclarationsModule,),
+                        ignored_modules=(
+                            DynamicExpressions.NonDifferentiableDeclarationsModule,
+                        ),
                     )
                 else
                     rethrow()
