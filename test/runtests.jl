@@ -23,22 +23,22 @@ if "jet" in test_name
         using DynamicExpressions
 
         if VERSION >= v"1.10"
-            # JET's API around ignored/target modules has changed across versions.
-            # We want to ignore the known-nondifferentiable declarations module,
-            # but avoid hard-failing due to keyword/API mismatches.
+            # JET's keyword API has changed across versions.
+            # Prefer the older (but still supported) configuration first.
             try
                 JET.test_package(
                     DynamicExpressions;
-                    target_modules=(DynamicExpressions,),
+                    target_defined_modules=true,
                     ignored_modules=(
                         DynamicExpressions.NonDifferentiableDeclarationsModule,
                     ),
                 )
             catch err
                 if err isa MethodError
+                    # Newer JET prefers explicit target_modules.
                     JET.test_package(
                         DynamicExpressions;
-                        target_defined_modules=true,
+                        target_modules=(DynamicExpressions,),
                         ignored_modules=(
                             DynamicExpressions.NonDifferentiableDeclarationsModule,
                         ),
