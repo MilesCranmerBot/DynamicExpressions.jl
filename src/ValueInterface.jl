@@ -17,7 +17,8 @@ get_number_type(::Type{T}) where {T<:Number} = T
 const _fallback_get_number_type_method = which(get_number_type, (Type,))
 
 @inline function _get_number_type_or_nothing(::Type{Tx}) where {Tx}
-    which(get_number_type, (Type{Tx},)) === _fallback_get_number_type_method && return nothing
+    which(get_number_type, (Type{Tx},)) === _fallback_get_number_type_method &&
+        return nothing
     return get_number_type(Tx)
 end
 
