@@ -11,6 +11,16 @@ is_valid_array(x::AbstractArray{T}) where {T<:Number} = is_valid(sum(x))
 get_number_type(t::Type) = error("Base number type of type $(t) is not defined")
 get_number_type(::Type{T}) where {T<:Number} = T
 
+# Avoid exception-based control flow in the interface test helpers below.
+# When DispatchDoctor's instability checks are enabled, `try/catch` can force
+# inference to widen to `Any` on some platforms.
+const _fallback_get_number_type_method = which(get_number_type, (Type,))
+
+@inline function _get_number_type_or_nothing(::Type{Tx}) where {Tx}
+    which(get_number_type, (Type{Tx},)) === _fallback_get_number_type_method && return nothing
+    return get_number_type(Tx)
+end
+
 """
     pack_scalar_constants!(nvals, idx, value)
 
@@ -60,22 +70,17 @@ end
 function _check_is_valid_array(x)
     return is_valid_array([x]) isa Bool && is_valid_array([x]) == is_valid(x)
 end
-function _check_get_number_type(x)
-    try
-        get_number_type(typeof(x)) <: Number
-    catch e
-        @error e
-        return false
-    end
+function _check_get_number_type(x)::Bool
+    T = _get_number_type_or_nothing(typeof(x))
+    return (T !== nothing) && (T <: Number)
 end
+
 function _check_pack_scalar_constants!(x)::Bool
-    T = try
-        get_number_type(typeof(x))
-    catch
-        return false
-    end
+    T = _get_number_type_or_nothing(typeof(x))
+    T === nothing && return false
 
     n = count_scalar_constants(x)
+    n isa Int || return false
     packed_x = Vector{T}(undef, n)
 
     applicable(pack_scalar_constants!, packed_x, 1, x) || return false
@@ -85,13 +90,11 @@ function _check_pack_scalar_constants!(x)::Bool
 end
 
 function _check_unpack_scalar_constants(x)::Bool
-    T = try
-        get_number_type(typeof(x))
-    catch
-        return false
-    end
+    T = _get_number_type_or_nothing(typeof(x))
+    T === nothing && return false
 
     n = count_scalar_constants(x)
+    n isa Int || return false
     packed_x = Vector{T}(undef, n)
 
     applicable(pack_scalar_constants!, packed_x, 1, x) || return false
