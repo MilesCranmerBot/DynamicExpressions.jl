@@ -68,26 +68,39 @@ function _check_get_number_type(x)
         return false
     end
 end
-function _check_pack_scalar_constants!(x)
-    Base.@nospecialize x
-    packed_x = Vector{get_number_type(typeof(x))}(undef, count_scalar_constants(x))
-    try
-        new_idx = Base.invokelatest(pack_scalar_constants!, packed_x, 1, x)
-        return new_idx == 1 + count_scalar_constants(x)
+function _check_pack_scalar_constants!(x)::Bool
+    T = try
+        get_number_type(typeof(x))
     catch
         return false
     end
+
+    n = count_scalar_constants(x)
+    packed_x = Vector{T}(undef, n)
+
+    applicable(pack_scalar_constants!, packed_x, 1, x) || return false
+
+    new_idx = pack_scalar_constants!(packed_x, 1, x)
+    return (new_idx isa Integer) && (new_idx == 1 + n)
 end
-function _check_unpack_scalar_constants(x)
-    Base.@nospecialize x
-    packed_x = Vector{get_number_type(typeof(x))}(undef, count_scalar_constants(x))
-    try
-        Base.invokelatest(pack_scalar_constants!, packed_x, 1, x)
-        new_idx, x2 = Base.invokelatest(unpack_scalar_constants, packed_x, 1, x)
-        return new_idx == 1 + count_scalar_constants(x) && x2 == x
+
+function _check_unpack_scalar_constants(x)::Bool
+    T = try
+        get_number_type(typeof(x))
     catch
         return false
     end
+
+    n = count_scalar_constants(x)
+    packed_x = Vector{T}(undef, n)
+
+    applicable(pack_scalar_constants!, packed_x, 1, x) || return false
+    applicable(unpack_scalar_constants, packed_x, 1, x) || return false
+
+    pack_scalar_constants!(packed_x, 1, x)
+    new_idx, x2 = unpack_scalar_constants(packed_x, 1, x)
+
+    return (new_idx isa Integer) && (new_idx == 1 + n) && (x2 == x)
 end
 function _check_count_scalar_constants(x)
     return count_scalar_constants(x) isa Int &&
