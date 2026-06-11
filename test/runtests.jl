@@ -56,7 +56,7 @@ if "jet" in test_names
             )
                 s_mod = string(mod.mod)
                 any(report.vst) do vst
-                    occursin(s_mod, string(JET.linfomod(vst.linfo)))
+                    return occursin(s_mod, string(JET.linfomod(vst.linfo)))
                 end
             end
             # On JET 0.10, `target_defined_modules` is not available and also
