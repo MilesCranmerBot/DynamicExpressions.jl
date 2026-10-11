@@ -1,5 +1,7 @@
 module ArenaNodeModule
 
+using DispatchDoctor: @unstable
+
 using ..UtilsModule: Nullable, Undefined
 
 import ..NodeModule:
@@ -371,7 +373,8 @@ end
 # root's new index. Works directly on entries, without facade traversal, so
 # copying out of a non-compact arena stays an array operation. `dest` must
 # already have room for the subtree at `cursor + 1` onward.
-function _write_subtree!(
+# `@unstable` (here and below): DispatchDoctor's check cannot fold inside recursion.
+@unstable function _write_subtree!(
     dest::Vector{ArenaEntry{T,D}}, src::Vector{ArenaEntry{T,D}}, idx, cursor
 ) where {T,D}
     iszero(idx) && throw(UndefRefError())  # unset child slot, like Node
@@ -389,7 +392,7 @@ function _write_subtree!(
     return Int32(cursor), cursor
 end
 
-function _subtree_count(src::Vector{<:ArenaEntry}, idx)
+@unstable function _subtree_count(src::Vector{<:ArenaEntry}, idx)
     iszero(idx) && throw(UndefRefError()) # unset child slot, like Node
     entry = @inbounds src[idx]
     n = 1
@@ -466,7 +469,7 @@ function copy_into!(
             set_ref!(length(src))
             return src
         end
-        return copy_into!(dest, copy_node(src); ref)
+        src = copy_node(src)
     end
     if is_compact_root(src)
         _copy_entries!(dest, get_arena(src).nodes)
