@@ -248,7 +248,7 @@ end
     return Expr(ex.head, args...)
 end
 
-"""Parse a Julia `Expr` object. Numeric literals include `NaN`, `Inf`, and `-Inf`."""
+"""Parse an expression Julia `Expr` object."""
 @unstable function parse_expression(
     ex;
     operators::Union{AbstractOperatorEnum,Nothing}=nothing,
