@@ -502,4 +502,6 @@ end
     @test get_child(get_tree(shared), 1) === get_child(get_tree(shared), 2)
     @test get_tree(broken) !== tree
     @test get_tree(shared) !== tree
+    structured = StructuredExpression((; f=ex); structure=nt -> nt.f)
+    @test copy_node(structured; break_sharing=Val(true)) isa StructuredExpression
 end
