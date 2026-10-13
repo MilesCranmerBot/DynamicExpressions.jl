@@ -488,10 +488,11 @@ OperatorEnum(((sin, cos), (+, -, *, /), (fma,)))
         "Differential operators are now automatically computed within the gradient call.",
         :OperatorEnum,
     )
-    for (op, s) in map(p -> (p.second, string("degree", p.first)), all_pairs)
+    ops = _pairs_to_ops_tuple(pair, pairs...)
+    for (degree, op) in enumerate(ops)
         if length(op) > OPERATOR_LIMIT_BEFORE_SLOWDOWN
             @warn(
-                "You have passed over $(OPERATOR_LIMIT_BEFORE_SLOWDOWN) $(s) operators. " *
+                "You have passed over $(OPERATOR_LIMIT_BEFORE_SLOWDOWN) degree$(degree) operators. " *
                     "To prevent long compilation times, some optimizations will be disabled. " *
                     "If this presents an issue, please open an issue on https://github.com/SymbolicML/DynamicExpressions.jl"
             )
@@ -508,7 +509,7 @@ OperatorEnum(((sin, cos), (+, -, *, /), (fma,)))
         @warn "Using `BroadcastFunction` in an `OperatorEnum` is not yet stable"
     end
 
-    operators = OperatorEnum(_pairs_to_ops_tuple(pair, pairs...))
+    operators = OperatorEnum(ops)
     if define_helper_functions
         @extend_operators_base operators empty_old_operators = empty_old_operators
         set_default_operators!(operators)
