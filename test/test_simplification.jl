@@ -135,3 +135,8 @@ tree = ((x1 - 0.2) - 0.6)
 @test repr(tree) ≈ "((x1 - 0.2) - 0.6)"
 @test repr(combine_operators(tree, operators)) ≈ "(x1 - 0.8)"
 ###############################################################################
+
+@testset "OperatorEnum repeated degrees retain every operator" begin
+    operators = OperatorEnum(1 => (sin,), 1 => (), 1 => (cos,))
+    @test operators.ops[1] == (sin, cos)
+end

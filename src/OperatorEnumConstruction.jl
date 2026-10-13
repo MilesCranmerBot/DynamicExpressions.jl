@@ -420,7 +420,7 @@ function _pairs_to_ops_tuple(
     # Fill in the operators at their respective degrees
     for (degree, operators) in all_pairs
         degree < 1 && throw(ArgumentError("Degree must be ≥ 1, got $degree"))
-        ops_array[degree] = operators
+        ops_array[degree] = (ops_array[degree]..., operators...)
     end
 
     return Tuple(ops_array)
@@ -445,7 +445,8 @@ This condition is sufficient for evaluation. Convenience operations on raw nonnu
 # Arguments
 
 - `pairs::Pair{Int,<:Tuple}...`: A variable number of `degree => operators` pairs, where each
-    `degree` is an integer and `operators` is a tuple of functions.
+    `degree` is an integer and `operators` is a tuple of functions. Repeated degrees
+    concatenate their operator tuples in argument order.
 
 # Keyword Arguments
 
@@ -528,7 +529,8 @@ and `(::AbstractExpressionNode)(X)`.
 # Arguments
 
 - `pairs::Pair{Int,<:Tuple}...`: A variable number of `degree => operators` pairs, where each
-    `degree` is an integer and `operators` is a tuple of functions.
+    `degree` is an integer and `operators` is a tuple of functions. Repeated degrees
+    concatenate their operator tuples in argument order.
 
 # Keyword Arguments
 
