@@ -350,6 +350,7 @@ include("base.jl")
 @inline function (::Type{N})(
     ::Type{T1}=Undefined; val=nothing, feature=nothing, op=nothing, l=nothing, r=nothing, children=nothing, allocator::F=default_allocator,
 ) where {T1,N<:AbstractExpressionNode{T} where T,F}
+    isnothing(l) && !isnothing(r) && throw(ArgumentError("The r child requires an l child."))
     _children = if !isnothing(l) && isnothing(r)
         @assert isnothing(children)
         (l,)

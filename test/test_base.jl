@@ -13,6 +13,12 @@ tree = cos(x1 * 3.2 - 5.8) * 0.2 - 0.5 * x2 * x3 * x3 + 0.9 / (x1 * x1 + 1);
     @test x.degree == 0
 end
 
+@testset "Right child requires left child" begin
+    x = Node{Float64}(; feature=1)
+    @test_throws ArgumentError Node{Float64}(; r=x)
+    @test_throws ArgumentError Node{Float64}(; op=1, r=x, children=(x,))
+end
+
 @testset "all" begin
     ctree = copy(tree)
     @test all(t -> t.degree != -1, ctree)
