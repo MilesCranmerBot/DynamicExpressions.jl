@@ -489,7 +489,6 @@ end
     copy_node(tree::AbstractExpressionNode; break_sharing::Val{BS}=Val(false)) where {BS}
 
 Copy a node, recursively copying all children nodes.
-Constant values are deep-copied unless their type is isbits.
 This is more efficient than the built-in copy.
 
 If `break_sharing` is set to `Val(true)`, sharing in a tree will be ignored.
@@ -516,7 +515,6 @@ end
     copy(tree::AbstractExpressionNode; break_sharing::Val=Val(false))
 
 Copy a node, recursively copying all children nodes.
-Constant values are deep-copied unless their type is isbits.
 This is more efficient than the built-in copy.
 
 If `break_sharing` is set to `Val(true)`, sharing in a tree will be ignored.

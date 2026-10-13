@@ -30,7 +30,7 @@ end
     copy_into!(dest::AbstractArray{N}, src::N) where {N<:AbstractExpressionNode}
 
 Copy a node, recursively copying all children nodes, in-place to a preallocated container.
-This allocates only when copying constant values that are not isbits.
+This should result in no extra allocations.
 """
 function copy_into!(
     dest::AbstractArray{N}, src::N; ref::Union{Nothing,Base.RefValue{<:Integer}}=nothing
