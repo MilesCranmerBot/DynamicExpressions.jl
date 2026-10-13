@@ -5,8 +5,6 @@
 Various functions in `Base` are overloaded to treat an `AbstractNode` as a
 collection of its nodes.
 
-Copying an `Expression` also copies arrays nested inside metadata arrays and `Dict`s.
-
 ```@docs
 copy(tree::AbstractExpressionNode; break_sharing::Val=Val(false))
 filter(f::Function, tree::AbstractNode; break_sharing::Val=Val(false))
