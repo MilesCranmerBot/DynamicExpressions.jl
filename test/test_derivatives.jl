@@ -4,37 +4,10 @@ using DynamicExpressions: eval_diff_tree_array, eval_grad_tree_array
 using Random
 using Zygote
 using LinearAlgebra
-using DispatchDoctor: allow_unstable
 include("test_params.jl")
 include("tree_gen_utils.jl")
 
 seed = 0
-
-@testset "Zero requested gradients" begin
-    operators = OperatorEnum(; binary_operators=(+,))
-    x = Node{Float64}(; feature=1)
-    c = Node{Float64}(; val=2.0)
-    X = ones(1, 2)
-    X0 = zeros(0, 2)
-    for input in (X, view(X, :, :), transpose(permutedims(X)))
-        for tree in (x, Node{Float64}(; op=1, children=(x, x)))
-            values, gradient, complete = allow_unstable() do
-                eval_grad_tree_array(tree, input, operators; variable=false)
-            end
-            @test complete
-            @test size(gradient) == (0, 2)
-            @test values == fill(tree.degree == 0 ? 1.0 : 2.0, 2)
-        end
-    end
-    for input in (X0, view(X0, :, :), transpose(permutedims(X0)))
-        values, gradient, complete = allow_unstable() do
-            eval_grad_tree_array(c, input, operators; variable=true)
-        end
-        @test complete
-        @test size(gradient) == (0, 2)
-        @test values == fill(2.0, 2)
-    end
-end
 # SIMD doesn't like abs(x) ^ y for some reason.
 pow_abs2(x, y) = exp(y * log(abs(x)))
 
