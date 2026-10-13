@@ -3,7 +3,7 @@ module EvaluateDerivativeModule
 import ..NodeModule: AbstractExpressionNode, constructorof, get_children
 import ..OperatorEnumModule: OperatorEnum
 import ..UtilsModule: fill_similar, ResultOk2
-import ..ValueInterfaceModule: is_valid, is_valid_array
+import ..ValueInterfaceModule: is_valid_array
 import ..NodeUtilsModule: count_constant_nodes, index_constant_nodes, NodeIndex
 import ..EvaluateModule:
     deg0_eval, get_op, get_nops, OPERATOR_LIMIT_BEFORE_SLOWDOWN, EvalContext
@@ -49,7 +49,7 @@ function eval_diff_tree_array(
 
     # TODO: `turbo` slows performance. Need to fix.
     result = _eval_diff_tree_array(tree, cX, operators, direction)
-    return (result.x, result.dx, all(is_valid, result.x) && all(is_valid, result.dx))
+    return (result.x, result.dx, is_valid_array(result.x) && is_valid_array(result.dx))
 end
 function eval_diff_tree_array(
     tree::AbstractExpressionNode{T1},
