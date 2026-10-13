@@ -125,3 +125,11 @@
 
     #literate_end
 end
+
+@testitem "Unparameterized conversion preserves degree" begin
+    for D in (1, 3), N in (Node, GraphNode)
+        x = N{Float64,D}(; feature=1)
+        @test convert(N, x) === x
+        @test N(x) === x
+    end
+end
