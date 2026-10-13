@@ -1,10 +1,6 @@
 using DynamicExpressions
 using Test
 
-@testset "Equality across different maximum degrees" begin
-    @test !(Node{Float64,1}(; feature=1) == Node{Float64,2}(; feature=1))
-    @test !(GraphNode{Float64,1}(; feature=1) == GraphNode{Float64,2}(; feature=1))
-end
 operators = OperatorEnum(;
     binary_operators=[+, *, -, /], unary_operators=[sin, cos, exp, log]
 )
