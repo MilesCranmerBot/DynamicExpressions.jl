@@ -91,6 +91,7 @@ end
 
 if "main" in test_names || !isempty(testitem_suffixes)
     @run_package_tests filter =
-        ti -> ("main" in test_names && dirname(ti.filename) == @__DIR__) ||
-              any(suf -> endswith(ti.filename, suf), testitem_suffixes)
+        ti ->
+            ("main" in test_names && dirname(ti.filename) == @__DIR__) ||
+                any(suf -> endswith(ti.filename, suf), testitem_suffixes)
 end
