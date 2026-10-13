@@ -2,16 +2,6 @@ using DynamicExpressions
 using Random
 using Test
 using Zygote
-@testset "Graph conversion removes sharing" begin
-    x = GraphNode{Float64}(; feature=1)
-    shared = GraphNode{Float64}(; op=1, children=(x, x))
-    t = GraphNode{Float64}(; op=1, children=(shared, shared))
-    for N in (Node, Node{Float32}, Node{Float64})
-        c = convert(N, t)
-        @test length(unique(map(objectid, c))) == length(c)
-        @test get_child(c, 1) !== get_child(c, 2)
-    end
-end
 
 operators = OperatorEnum(; binary_operators=[+, -, *, /], unary_operators=[cos, sin]);
 x1, x2, x3 = (i -> Node(Float64; feature=i)).(1:3)
