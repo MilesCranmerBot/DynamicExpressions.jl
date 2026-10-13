@@ -2,6 +2,78 @@ using DynamicExpressions
 using Random
 using Test
 using Zygote
+@testset "Node API regressions" begin
+    @testset "Constructor degree inference" begin
+        for D in (1, 3), N in (Node, GraphNode)
+            x = N{Float64,D}(; feature=1)
+            for cs in ((x,), ntuple(_ -> x, D), [x])
+                n = N(; op=1, children=cs)
+                @test typeof(n) === typeof(x)
+                @test get_children(n, length(cs)) == Tuple(cs)
+            end
+        end
+    end
+    @testset "Unparameterized conversion preserves degree" begin
+        for D in (1, 3), N in (Node, GraphNode)
+            x = N{Float64,D}(; feature=1)
+            @test convert(N, x) === x
+            @test N(x) === x
+        end
+    end
+    @testset "Children cannot be dropped" begin
+        x = Node{Float64}(; feature=1)
+        @test_throws ArgumentError Node{Float64}(; r=x)
+        @test_throws ArgumentError Node{Float64}(; op=1, r=x, children=(x,))
+        @test_throws ArgumentError set_children!(x, (x, x, x))
+        @test_throws ArgumentError set_children!(x, [x, x, x])
+        @test x.degree == 0
+    end
+    @testset "Abstract element type copies" begin
+        x = Node{Real}(; val=1.0)
+        for t in (x, Node{Real}(; op=1, children=(x,)))
+            @test typeof(copy_node(t)) === typeof(t)
+            @test copy_node(t) == t
+        end
+    end
+    @testset "Graph iteration matches length" begin
+        x = GraphNode{Float64}(; feature=1)
+        t = GraphNode{Float64}(; op=1, children=(x, x))
+        @test length([n for n in t]) == length(t)
+        @test [objectid(n) for n in t] == map(objectid, collect(t))
+    end
+    @testset "Graph conversion removes sharing" begin
+        x = GraphNode{Float64}(; feature=1)
+        shared = GraphNode{Float64}(; op=1, children=(x, x))
+        t = GraphNode{Float64}(; op=1, children=(shared, shared))
+        for N in (Node, Node{Float32}, Node{Float64})
+            c = convert(N, t)
+            @test length(unique(map(objectid, c))) == length(c)
+            @test get_child(c, 1) !== get_child(c, 2)
+        end
+    end
+    @testset "Copies own mutable values" begin
+        for val in ([1.0, 2.0], ([1.0],))
+            t = Node(; val)
+            c = copy_node(t)
+            d = DynamicExpressions.copy_into!(DynamicExpressions.allocate_container(t), t)
+            @test c.val == t.val
+            @test d.val == t.val
+            if val isa Vector
+                @test c.val !== t.val
+                @test d.val !== t.val
+                c.val[1] = 99.0
+                d.val[1] = 77.0
+                @test t.val == [1.0, 2.0]
+            else
+                @test c.val[1] !== t.val[1]
+                @test d.val[1] !== t.val[1]
+                c.val[1][1] = 99.0
+                d.val[1][1] = 77.0
+                @test t.val[1] == [1.0]
+            end
+        end
+    end
+end
 
 operators = OperatorEnum(; binary_operators=[+, -, *, /], unary_operators=[cos, sin]);
 x1, x2, x3 = (i -> Node(Float64; feature=i)).(1:3)

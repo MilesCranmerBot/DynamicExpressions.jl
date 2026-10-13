@@ -191,11 +191,12 @@ By using this instead of tree_mapreduce, we can take advantage of early exits.
 end
 
 function Base.:(==)(a::AbstractExpressionNode, b::AbstractExpressionNode)
+    max_degree(a) == max_degree(b) || return false
     return Base.:(==)(promote(a, b)...)
 end
 function Base.:(==)(a::N, b::N)::Bool where {N<:AbstractExpressionNode}
     if preserve_sharing(N)
-        return inner_is_equal(a, b, (; a=Dict{UInt,Nothing}(), b=Dict{UInt,Nothing}()))
+        return inner_is_equal(a, b, (; a=Dict{UInt,UInt}(), b=Dict{UInt,UInt}()))
     else
         return inner_is_equal(a, b, nothing)
     end
@@ -210,7 +211,7 @@ end
             has_a = haskey(id_maps.a, ids.a)
             has_b = haskey(id_maps.b, ids.b)
             if has_a && has_b
-                return true
+                return id_maps.a[ids.a] == ids.b && id_maps.b[ids.b] == ids.a
             elseif has_a ⊻ has_b
                 return false
             end
@@ -237,8 +238,8 @@ end
             )
         end
         if !isnothing(ids)
-            id_maps.a[ids.a] = nothing
-            id_maps.b[ids.b] = nothing
+            id_maps.a[ids.a] = ids.b
+            id_maps.b[ids.b] = ids.a
         end
         return result
     end
@@ -249,7 +250,7 @@ end
 end
 @inline function leaf_equal(
     a::AbstractExpressionNode{T1}, b::AbstractExpressionNode{T2}
-) where {T1,T2}
+)::Bool where {T1,T2}
     constant = a.constant
     constant != b.constant && return false
     if constant
@@ -449,7 +450,7 @@ end
 
 isempty(::AbstractNode) = false  # COV_EXCL_LINE
 function iterate(root::AbstractNode)
-    return (root, collect(root; break_sharing=Val(true))[(begin + 1):end])
+    return (root, collect(root)[(begin + 1):end])
 end
 @unstable iterate(::AbstractNode, stack) =
     isempty(stack) ? nothing : (popfirst!(stack), stack)
@@ -479,7 +480,13 @@ function hash(
     )
 end
 function leaf_hash(h::UInt, t::AbstractExpressionNode)
-    return t.constant ? hash((0, t.val), h) : hash((1, t.feature), h)
+    if t.constant
+        val = t.val
+        val = val isa AbstractFloat && iszero(val) ? zero(val) : val
+        return hash((0, val), h)
+    else
+        return hash((1, t.feature), h)
+    end
 end
 function branch_hash(h::UInt, t::AbstractExpressionNode, children::Vararg{Any,M}) where {M}
     return hash((t.degree + 1, t.op, children), h)
@@ -489,6 +496,7 @@ end
     copy_node(tree::AbstractExpressionNode; break_sharing::Val{BS}=Val(false)) where {BS}
 
 Copy a node, recursively copying all children nodes.
+Constant values are deep-copied unless their type is isbits.
 This is more efficient than the built-in copy.
 
 If `break_sharing` is set to `Val(true)`, sharing in a tree will be ignored.
@@ -500,7 +508,7 @@ function copy_node(
 end
 function leaf_copy(t::N) where {T,N<:AbstractExpressionNode{T}}
     if t.constant
-        return constructorof(N)(; val=t.val)
+        return constructorof(N)(T; val=copy_value(t.val::T))
     else
         return constructorof(N)(T; feature=t.feature)
     end
@@ -509,10 +517,13 @@ function branch_copy(t::N, children::Vararg{Any,M}) where {T,N<:AbstractExpressi
     return constructorof(N)(T; op=t.op, children)
 end
 
+@inline copy_value(x::T) where {T} = isbitstype(T) ? x : deepcopy(x)
+
 """
     copy(tree::AbstractExpressionNode; break_sharing::Val=Val(false))
 
 Copy a node, recursively copying all children nodes.
+Constant values are deep-copied unless their type is isbits.
 This is more efficient than the built-in copy.
 
 If `break_sharing` is set to `Val(true)`, sharing in a tree will be ignored.
@@ -548,7 +559,8 @@ function convert(
         identity,
         (p, children...) -> branch_convert(N1, p, children...),
         tree,
-        N1,
+        N1;
+        break_sharing=Val(!preserve_sharing(N1)),
     )
     # TODO: Need to allow user to overload this!
 end
@@ -559,8 +571,9 @@ function convert(
 end
 function convert(
     ::Type{N1}, tree::N2
-) where {T2,N1<:AbstractExpressionNode,N2<:AbstractExpressionNode{T2}}
-    return convert(with_type_parameters(N1, T2), tree)
+) where {T2,D,N1<:AbstractExpressionNode,N2<:AbstractExpressionNode{T2,D}}
+    NT = has_max_degree(N1) ? N1 : with_max_degree(N1, Val(D))
+    return convert(with_type_parameters(NT, T2), tree)
 end
 function (::Type{N})(tree::AbstractExpressionNode) where {N<:AbstractExpressionNode}
     return convert(N, tree)
