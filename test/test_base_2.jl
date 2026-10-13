@@ -176,3 +176,10 @@ end
         end
     end
 end
+
+@testitem "Graph iteration matches length" begin
+    x = GraphNode{Float64}(; feature=1)
+    t = GraphNode{Float64}(; op=1, children=(x, x))
+    @test length([n for n in t]) == length(t)
+    @test [objectid(n) for n in t] == map(objectid, collect(t))
+end

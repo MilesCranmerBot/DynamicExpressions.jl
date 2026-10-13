@@ -141,12 +141,6 @@ end
     @test length(tree.l) == 16
     @test length(tree.r) == 24 - 16 - 1
 end
-@testset "Graph iteration matches length" begin
-    x = GraphNode{Float64}(; feature=1)
-    t = GraphNode{Float64}(; op=1, children=(x, x))
-    @test length([n for n in t]) == length(t)
-    @test [objectid(n) for n in t] == map(objectid, collect(t))
-end
 
 @testset "mapreduce" begin
     @test mapreduce(_ -> 1, +, tree) == 24
