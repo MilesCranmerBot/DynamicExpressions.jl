@@ -107,24 +107,16 @@ function string_variable(feature, variable_names)
     end
 end
 
-# Julia, Python, and SymPy all parse `-a ^ b` as `-(a ^ b)`, so signed bases need brackets.
-@inline function needs_base_brackets(op, base)
-    is_pow = last(op) == '^' && (length(op) == 1 || (length(op) == 2 && first(op) == '.'))
-    return is_pow && !isempty(base) && first(base) in ('-', '+')
-end
-
 # Vector of chars is faster than strings, so we use that.
 function combine_op_with_inputs(op, args::Vararg{Any,D})::Vector{Char} where {D}
     if D == 2 && (first(op) in ('+', '-', '*', '/', '^', '.', '>', '<', '=') || op == "!=")
         # "(l op r)"
         out = ['(']
-        if needs_base_brackets(op, args[1])
-            push!(out, '(')
-            append!(out, args[1])
-            push!(out, ')')
-        else
-            append!(out, args[1])
-        end
+        # `-a ^ b` parses as `-(a ^ b)`, so a signed base needs brackets.
+        signed_base = op in (['^'], ['.', '^']) && first(args[1]) in ('-', '+')
+        signed_base && push!(out, '(')
+        append!(out, args[1])
+        signed_base && push!(out, ')')
         push!(out, ' ')
         append!(out, op)
         push!(out, ' ')
