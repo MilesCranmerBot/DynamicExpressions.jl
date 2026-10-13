@@ -49,7 +49,7 @@ function eval_diff_tree_array(
 
     # TODO: `turbo` slows performance. Need to fix.
     result = _eval_diff_tree_array(tree, cX, operators, direction)
-    return (result.x, result.dx, result.ok)
+    return (result.x, result.dx, all(isfinite, result.x) && all(isfinite, result.dx))
 end
 function eval_diff_tree_array(
     tree::AbstractExpressionNode{T1},
@@ -188,7 +188,8 @@ to every constant in the expression.
 # Returns
 
 - `(evaluation, gradient, complete)::Tuple{AbstractVector{T}, AbstractMatrix{T}, Bool}`: the normal evaluation,
-    the gradient, and whether the evaluation completed as normal (or encountered a nan or inf).
+    the gradient with shape `[num_gradients, num_rows]` (including zero gradients),
+    and whether the evaluation completed as normal (or encountered a nan or inf).
 """
 function eval_grad_tree_array(
     tree::AbstractExpressionNode{T},
@@ -373,7 +374,7 @@ function grad_deg0_eval(
 )::ResultOk2 where {T<:Number,mode}
     const_part = deg0_eval(tree, cX, EvalContext()).x
 
-    zero_mat = if isa(cX, Array)
+    zero_mat = if isa(cX, Array) || iszero(n_gradients)
         fill_similar(zero(T), cX, n_gradients, axes(cX, 2))
     else
         hcat([fill_similar(zero(T), cX, axes(cX, 2)) for _ in 1:n_gradients]...)'
