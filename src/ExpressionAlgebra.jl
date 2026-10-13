@@ -58,9 +58,11 @@ allow_chaining(@nospecialize(op)) = false
 allow_chaining(::typeof(+)) = true
 allow_chaining(::typeof(*)) = true
 
-function apply_operator(op::F, args::Vararg{Any,D}) where {F<:Function,D}
-    idx = findfirst(e -> e isa AbstractExpression, args)::Int
-    example_expr = args[idx]
+function apply_operator(
+    op::F,
+    args::Vararg{Any,D};
+    example_expr=args[findfirst(e -> e isa AbstractExpression, args)::Int],
+) where {F<:Function,D}
     E = typeof(example_expr)
     @assert all(e -> !(e isa AbstractExpression) || typeof(e) === E, args)
     operators = get_operators(example_expr, nothing)
@@ -74,7 +76,7 @@ function apply_operator(op::F, args::Vararg{Any,D}) where {F<:Function,D}
         if allow_chaining(op) && D > 2
             # These operators might get chained by Julia, so we check
             # downward for any matching arity.
-            inner = apply_operator(op, args[1:(end - 1)]...)
+            inner = apply_operator(op, args[1:(end - 1)]...; example_expr)
             return apply_operator(op, inner, args[end])
         end
         throw(
