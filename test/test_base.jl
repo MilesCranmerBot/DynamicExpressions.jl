@@ -3,6 +3,41 @@ using Random
 using Test
 using Zygote
 
+@testset "Abstract element type copies" begin
+    x = Node{Real}(; val=1.0)
+    for t in (x, Node{Real}(; op=1, children=(x,)))
+        c = copy_node(t)
+        @test typeof(c) === typeof(t)
+        @test c.degree == t.degree
+        leaf = c.degree == 0 ? c : get_child(c, 1)
+        @test leaf.degree == 0
+        @test leaf.constant
+        @test leaf.val === x.val
+    end
+end
+@testset "Copies own mutable values" begin
+    for val in ([1.0, 2.0], ([1.0],))
+        t = Node(; val)
+        c = copy_node(t)
+        d = DynamicExpressions.copy_into!(DynamicExpressions.allocate_container(t), t)
+        @test c.val == t.val
+        @test d.val == t.val
+        if val isa Vector
+            @test c.val !== t.val
+            @test d.val !== t.val
+            c.val[1] = 99.0
+            d.val[1] = 77.0
+            @test t.val == [1.0, 2.0]
+        else
+            @test c.val[1] !== t.val[1]
+            @test d.val[1] !== t.val[1]
+            c.val[1][1] = 99.0
+            d.val[1][1] = 77.0
+            @test t.val[1] == [1.0]
+        end
+    end
+end
+
 operators = OperatorEnum(; binary_operators=[+, -, *, /], unary_operators=[cos, sin]);
 x1, x2, x3 = (i -> Node(Float64; feature=i)).(1:3)
 tree = cos(x1 * 3.2 - 5.8) * 0.2 - 0.5 * x2 * x3 * x3 + 0.9 / (x1 * x1 + 1);

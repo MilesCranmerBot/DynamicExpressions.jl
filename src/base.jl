@@ -489,6 +489,7 @@ end
     copy_node(tree::AbstractExpressionNode; break_sharing::Val{BS}=Val(false)) where {BS}
 
 Copy a node, recursively copying all children nodes.
+Constant values are deep-copied unless their type is isbits.
 This is more efficient than the built-in copy.
 
 If `break_sharing` is set to `Val(true)`, sharing in a tree will be ignored.
@@ -500,7 +501,7 @@ function copy_node(
 end
 function leaf_copy(t::N) where {T,N<:AbstractExpressionNode{T}}
     if t.constant
-        return constructorof(N)(; val=t.val)
+        return constructorof(N)(T; val=copy_value(t.val::T))
     else
         return constructorof(N)(T; feature=t.feature)
     end
@@ -509,10 +510,13 @@ function branch_copy(t::N, children::Vararg{Any,M}) where {T,N<:AbstractExpressi
     return constructorof(N)(T; op=t.op, children)
 end
 
+@inline copy_value(x::T) where {T} = isbitstype(T) ? x : deepcopy(x)
+
 """
     copy(tree::AbstractExpressionNode; break_sharing::Val=Val(false))
 
 Copy a node, recursively copying all children nodes.
+Constant values are deep-copied unless their type is isbits.
 This is more efficient than the built-in copy.
 
 If `break_sharing` is set to `Val(true)`, sharing in a tree will be ignored.

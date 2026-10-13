@@ -7,6 +7,7 @@ using ..NodeModule:
     leaf_copy,
     branch_copy,
     set_node!,
+    copy_value,
     set_children!
 
 """
@@ -29,7 +30,7 @@ end
     copy_into!(dest::AbstractArray{N}, src::N) where {N<:AbstractExpressionNode}
 
 Copy a node, recursively copying all children nodes, in-place to a preallocated container.
-This should result in no extra allocations.
+This allocates only when copying constant values that are not isbits.
 """
 function copy_into!(
     dest::AbstractArray{N}, src::N; ref::Union{Nothing,Base.RefValue{<:Integer}}=nothing
@@ -51,6 +52,9 @@ function copy_into!(
 end
 function leaf_copy_into!(dest::N, src::N) where {N<:AbstractExpressionNode}
     set_node!(dest, src)
+    if !isbitstype(eltype(N)) && src.constant
+        dest.val = copy_value(src.val)
+    end
     return dest
 end
 function branch_copy_into!(
