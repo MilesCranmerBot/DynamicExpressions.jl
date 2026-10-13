@@ -1,3 +1,96 @@
+@testitem "Parametric leaf equality respects active tags" begin
+    using DynamicExpressions
+    using DynamicExpressions.ParametricExpressionModule: set_leaf!
+
+    feature = ParametricNode{Float64}(; feature=1)
+    constant = ParametricNode{Float64}(; feature=1)
+    set_leaf!(constant, ParametricNode(; val=2.0))
+    parameter = ParametricNode{Float64}(; feature=1)
+    parameter.is_parameter = true
+    parameter.parameter = 1
+    tagged_constant = copy(parameter)
+    set_leaf!(tagged_constant, ParametricNode(; val=2.0))
+    leaves = (feature, constant, parameter, tagged_constant)
+    for a in leaves, b in leaves
+        @test (a == b) == (b == a)
+        @test (a == b) == (
+            a.constant == b.constant && (
+                if a.constant
+                    a.val == b.val
+                else
+                    a.is_parameter == b.is_parameter &&
+                    (a.is_parameter ? a.parameter == b.parameter : a.feature == b.feature)
+                end
+            )
+        )
+        a == b && @test hash(a) == hash(b)
+    end
+end
+
+@testitem "Parametric scalar setters require exact length" begin
+    using DynamicExpressions
+
+    for tree in (ParametricNode{Float64}(; feature=1), ParametricNode(; val=3.0))
+        ex = ParametricExpression(tree; operators=nothing, parameters=[10.0 20.0])
+        old, refs = get_scalar_constants(ex)
+        for x in (Float64[], old[1:(end - 1)], vcat(old, 4.0))
+            @test_throws DimensionMismatch set_scalar_constants!(ex, x, refs)
+            @test first(get_scalar_constants(ex)) == old
+        end
+        replacement = reverse(old)
+        @test set_scalar_constants!(ex, replacement, refs) === ex
+        @test first(get_scalar_constants(ex)) == replacement
+    end
+end
+
+@testitem "Parametric evaluation accepts zero samples" begin
+    using DynamicExpressions
+
+    operators = OperatorEnum(1 => (identity,), 2 => (+,); define_helper_functions=false)
+    parameter = ParametricNode{Float64}(; feature=1)
+    parameter.is_parameter = true
+    parameter.parameter = 1
+    feature = ParametricNode{Float64}(; feature=1)
+    for tree in (
+        ParametricNode(; val=2.0),
+        feature,
+        parameter,
+        ParametricNode(; op=1, children=(feature, parameter)),
+    )
+        ex = ParametricExpression(tree; operators, parameters=[10.0 20.0])
+        @test eval_tree_array(ex, zeros(1, 0), Int[]) == (Float64[], true)
+        @test ex(zeros(1, 0), Int[]) == Float64[]
+    end
+end
+
+@testitem "Parametric scalar setters snapshot overlapping input" begin
+    using DynamicExpressions
+
+    parameters = [10.0 20.0]
+    ex = ParametricExpression(
+        ParametricNode{Float64}(; feature=1); operators=nothing, parameters
+    )
+    _, refs = get_scalar_constants(ex)
+    input = view(vec(parameters), 2:-1:1)
+    expected = copy(input)
+    @test Base.mightalias(input, get_metadata(ex).parameters)
+    set_scalar_constants!(ex, input, refs)
+    @test first(get_scalar_constants(ex)) == expected
+end
+
+@testitem "Parametric copies own mutable constant values" begin
+    using DynamicExpressions
+
+    tree = ParametricNode(; val=[1.0, 2.0])
+    ex = ParametricExpression(tree; operators=nothing, parameters=reshape([[3.0]], 1, 1))
+    for copied in (copy(tree), get_tree(copy(ex)))
+        @test copied !== tree
+        @test copied.val == tree.val
+        @test copied.val !== tree.val
+        copied.val[1] = 4.0
+        @test tree.val == [1.0, 2.0]
+    end
+end
 @testitem "Conversion should not change metadata" begin
     using DynamicExpressions
 

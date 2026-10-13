@@ -1,3 +1,42 @@
+@testitem "Structured scalar setters require exact length" begin
+    using DynamicExpressions
+
+    inner = ParametricExpression(
+        ParametricNode{Float64}(; feature=1); operators=nothing, parameters=[10.0 20.0]
+    )
+    ex = StructuredExpression((; inner); structure=nt -> nt.inner)
+    old, refs = get_scalar_constants(ex)
+    for input in (Float64[], [1.0], [1.0, 2.0, 3.0])
+        @test_throws DimensionMismatch set_scalar_constants!(ex, input, refs)
+        @test first(get_scalar_constants(ex)) == old
+    end
+    @test set_scalar_constants!(ex, [1.0, 2.0], refs) === ex
+    @test first(get_scalar_constants(ex)) == [1.0, 2.0]
+end
+
+@testitem "Structured scalar setters snapshot overlapping input" begin
+    using DynamicExpressions
+
+    parameters = [10.0 20.0]
+    a = ParametricExpression(
+        ParametricNode{Float64}(; feature=1);
+        operators=nothing,
+        parameters=view(parameters, :, 1:1),
+    )
+    b = ParametricExpression(
+        ParametricNode{Float64}(; feature=1);
+        operators=nothing,
+        parameters=view(parameters, :, 2:2),
+    )
+    ex = StructuredExpression((; a, b); structure=nt -> nt.a)
+    _, refs = get_scalar_constants(ex)
+    input = view(vec(parameters), 2:-1:1)
+    expected = copy(input)
+    @test Base.mightalias(input, get_metadata(a).parameters)
+    @test Base.mightalias(input, get_metadata(b).parameters)
+    set_scalar_constants!(ex, input, refs)
+    @test first(get_scalar_constants(ex)) == expected
+end
 @testitem "StructuredExpression basics" begin
     using DynamicExpressions
 

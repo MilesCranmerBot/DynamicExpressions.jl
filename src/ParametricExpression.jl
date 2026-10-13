@@ -125,7 +125,7 @@ end
 preserve_sharing(::Union{Type{<:ParametricNode},ParametricNode}) = false  # COV_EXCL_LINE
 function leaf_copy(t::ParametricNode{T}) where {T}
     if t.constant
-        return constructorof(typeof(t))(; val=t.val)
+        return constructorof(typeof(t))(; val=isbitstype(T) ? t.val : deepcopy(t.val))
     elseif !t.is_parameter
         return constructorof(typeof(t))(T; feature=t.feature)
     else
@@ -176,13 +176,14 @@ function leaf_hash(h::UInt, t::ParametricNode)
     end
 end
 function leaf_equal(a::ParametricNode, b::ParametricNode)
+    a.constant == b.constant || return false
     if a.constant
-        return b.constant && a.val == b.val
+        return a.val == b.val
     else
         if a.is_parameter
             return b.is_parameter && a.parameter == b.parameter
         else
-            return a.feature == b.feature
+            return !b.is_parameter && a.feature == b.feature
         end
     end
 end
@@ -265,7 +266,14 @@ function get_scalar_constants(ex::ParametricExpression{T}) where {T}
     refs = (; constant_refs, parameter_refs=parameters, num_parameters, num_constants)
     return combined_scalars, refs
 end
+"""Replace all scalar constants with an exact-length input, allowing overlapping parameter storage."""
 function set_scalar_constants!(ex::ParametricExpression{T}, x, refs) where {T}
+    length(x) == refs.num_constants + refs.num_parameters || throw(
+        DimensionMismatch(
+            "Expected $(refs.num_constants + refs.num_parameters) scalar constants, got $(length(x))",
+        ),
+    )
+    x = Base.unalias(get_metadata(ex).parameters, x)
     # First, set the usual constants
     set_scalar_constants!(
         get_tree(ex), @view(x[1:(refs.num_constants)]), refs.constant_refs
@@ -376,7 +384,7 @@ function eval_tree_array(
     kws...,
 ) where {T}
     @assert length(classes) == size(X, 2)
-    @assert maximum(classes) <= size(ex.metadata.parameters, 2)  # TODO: Remove when comfortable
+    @assert isempty(classes) || maximum(classes) <= size(ex.metadata.parameters, 2)  # TODO: Remove when comfortable
     parameters = ex.metadata.parameters
     indexed_parameters = [
         parameters[i_parameter, classes[i_row]] for

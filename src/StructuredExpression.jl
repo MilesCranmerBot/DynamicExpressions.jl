@@ -159,12 +159,19 @@ function get_scalar_constants(e::AbstractStructuredExpression)
     refs = map(c_ref -> (; n=length(first(c_ref)), ref=last(c_ref)), consts_and_refs)
     return flat_constants, refs
 end
+"""Replace all member scalar constants with an exact-length snapshot of the input."""
 function set_scalar_constants!(e::AbstractStructuredExpression, constants, refs)
+    length(constants) == sum(r -> r.n, refs) || throw(
+        DimensionMismatch(
+            "Expected $(sum(r -> r.n, refs)) scalar constants, got $(length(constants))"
+        ),
+    )
+    constants = copy(constants)
     cursor = Ref(1)
     foreach(values(get_contents(e)), refs) do tree, r
         n = r.n
         i = cursor[]
-        c = constants[i:(i + n - 1)]
+        c = @view constants[i:(i + n - 1)]
         set_scalar_constants!(tree, c, r.ref)
         cursor[] += n
     end
