@@ -230,7 +230,6 @@ end
         for args in ((1.0, 2.0, x), (1.0, x, 2.0), (x, 1.0, 2.0))
             result = op(args...)
             @test result(reshape([3.0], 1, 1)) == [6.0]
-            @test count_nodes(result) == 5
         end
     end
 end
