@@ -15,7 +15,11 @@ invalid_value(::Type{T}) where {T<:AbstractFloat} = T(NaN)
 invalid_value(::Type{Complex{T}}) where {T<:AbstractFloat} = Complex{T}(T(NaN), zero(T))
 
 is_valid_array(x::AbstractArray{T}) where {T} = all(is_valid, x)
-is_valid_array(x::AbstractArray{T}) where {T<:Number} = is_valid(sum(x))
+function is_valid_array(
+    x::AbstractArray{T}
+) where {T<:Union{AbstractFloat,Complex{<:AbstractFloat}}}
+    return is_valid(sum(x)) || all(is_valid, x)
+end
 
 get_number_type(t::Type) = error("Base number type of type $(t) is not defined")
 get_number_type(::Type{T}) where {T<:Number} = T  # COV_EXCL_LINE
