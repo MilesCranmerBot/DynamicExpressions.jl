@@ -188,8 +188,7 @@ to every constant in the expression.
 # Returns
 
 - `(evaluation, gradient, complete)::Tuple{AbstractVector{T}, AbstractMatrix{T}, Bool}`: the normal evaluation,
-    the gradient with shape `[num_gradients, num_rows]` (including zero gradients),
-    and whether the evaluation completed as normal (or encountered a nan or inf).
+    the gradient, and whether the evaluation completed as normal (or encountered a nan or inf).
 """
 function eval_grad_tree_array(
     tree::AbstractExpressionNode{T},
