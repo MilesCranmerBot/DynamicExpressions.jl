@@ -135,3 +135,27 @@ tree = ((x1 - 0.2) - 0.6)
 @test repr(tree) ≈ "((x1 - 0.2) - 0.6)"
 @test repr(combine_operators(tree, operators)) ≈ "(x1 - 0.8)"
 ###############################################################################
+
+@testset "combine_operators preserves its input" begin
+    operators = OperatorEnum(2 => (+, -, *, /))
+    for expression_type in (Expression, ParametricExpression)
+        kws = if expression_type === ParametricExpression
+            (; parameters=zeros(1, 1), parameter_names=["p"])
+        else
+            (;)
+        end
+        ex = parse_expression(
+            :((x + 1.0) + 2.0); expression_type, operators, variable_names=["x"], kws...
+        )
+        original = copy(ex)
+        result = combine_operators(ex)
+        @test ex == original
+        @test string_tree(result) == "x + 3.0"
+        @test get_tree(result) !== get_tree(ex)
+    end
+    tree = (Node{Float64}(; feature=1) + 1.0) + 2.0
+    original = copy(tree)
+    result = combine_operators(tree, operators)
+    @test tree == original
+    @test string_tree(result, operators) == "x1 + 3.0"
+end

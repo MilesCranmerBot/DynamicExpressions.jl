@@ -5,6 +5,9 @@
 Various functions in `Base` are overloaded to treat an `AbstractNode` as a
 collection of its nodes.
 
+For binary `Node` and `ParametricNode` trees, `combine_operators` combines nested
+arithmetic constants in a copy and leaves the input unchanged.
+
 ```@docs
 copy(tree::AbstractExpressionNode; break_sharing::Val=Val(false))
 filter(f::Function, tree::AbstractNode; break_sharing::Val=Val(false))
