@@ -445,8 +445,7 @@ This condition is sufficient for evaluation. Convenience operations on raw nonnu
 # Arguments
 
 - `pairs::Pair{Int,<:Tuple}...`: A variable number of `degree => operators` pairs, where each
-    `degree` is an integer and `operators` is a tuple of functions. Repeated degrees
-    concatenate their operator tuples in argument order.
+    `degree` is an integer and `operators` is a tuple of functions.
 
 # Keyword Arguments
 
@@ -530,8 +529,7 @@ and `(::AbstractExpressionNode)(X)`.
 # Arguments
 
 - `pairs::Pair{Int,<:Tuple}...`: A variable number of `degree => operators` pairs, where each
-    `degree` is an integer and `operators` is a tuple of functions. Repeated degrees
-    concatenate their operator tuples in argument order.
+    `degree` is an integer and `operators` is a tuple of functions.
 
 # Keyword Arguments
 
