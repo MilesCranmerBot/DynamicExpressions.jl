@@ -528,6 +528,8 @@ end
         Node{Float64}(; feature=1);
         payload=[[1.0, 2.0]],
         state=Dict("weights" => [1.0, 2.0]),
+        labels=Dict("x" => "input"),
+        tags=[:a, :b],
     )
     copied = copy(ex)
 
