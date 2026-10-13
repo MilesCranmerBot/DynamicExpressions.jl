@@ -52,9 +52,7 @@ function copy_into!(
 end
 function leaf_copy_into!(dest::N, src::N) where {N<:AbstractExpressionNode}
     set_node!(dest, src)
-    if !isbitstype(eltype(N)) && src.constant
-        dest.val = copy_value(src.val)
-    end
+    !isbitstype(eltype(N)) && src.constant && (dest.val = copy_value(src.val))
     return dest
 end
 function branch_copy_into!(
