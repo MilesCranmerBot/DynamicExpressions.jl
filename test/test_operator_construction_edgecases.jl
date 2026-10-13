@@ -37,3 +37,12 @@ end
     # tidy the package-level globals so later tests aren't affected
     empty_all_globals!()
 end
+
+@testitem "OperatorEnum repeated degrees retain every operator" begin
+    operators = OperatorEnum(1 => (sin,), 1 => (), 1 => (cos,))
+    @test operators.ops[1] == (sin, cos)
+    eight_ops = ntuple(i -> (x -> x + i), 8)
+    @test_logs (:warn, r"passed over 15 degree1") OperatorEnum(
+        1 => eight_ops, 1 => eight_ops; define_helper_functions=false
+    )
+end
