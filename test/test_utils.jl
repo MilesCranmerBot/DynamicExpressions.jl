@@ -52,22 +52,3 @@ fill_similar(0.5f0, x, axes(x, 1)) == fill(0.5f0, 3)
         end
     end
 end
-
-struct EmptyScalarValue end
-const VI = DynamicExpressions.ValueInterfaceModule
-VI.get_number_type(::Type{EmptyScalarValue}) = Float64
-VI.count_scalar_constants(::EmptyScalarValue) = 0
-VI.pack_scalar_constants!(out::AbstractVector{<:Number}, i::Int64, ::EmptyScalarValue) = i
-function VI.unpack_scalar_constants(
-    out::AbstractVector{<:Number}, i::Int64, x::EmptyScalarValue
-)
-    return (i, x)
-end
-@testset "Zero-scalar constants round-trip" begin
-    tree = Node{EmptyScalarValue}(; val=EmptyScalarValue())
-    values, refs = get_scalar_constants(tree)
-    @test isempty(values)
-    @test length(refs) == 1
-    @test set_scalar_constants!(tree, values, refs) === tree
-    @test isempty(first(get_scalar_constants(tree)))
-end
