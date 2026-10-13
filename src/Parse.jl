@@ -13,6 +13,7 @@ using ..ExpressionModule:
     get_variable_names,
     node_type
 using ..ExpressionAlgebraModule: declare_operator_alias
+using ..StringsModule: get_op_name
 
 """
     @parse_expression(expr; operators, variable_names, node_type=Node, evaluate_on=[])
@@ -21,7 +22,7 @@ using ..ExpressionAlgebraModule: declare_operator_alias
 
 ## Arguments
 
-- `expr`: An expression to parse into an `AbstractExpression`.
+- `expr`: An expression to parse into an `AbstractExpression`. Both ordinary and broadcast function calls are supported.
 
 ## Keyword Arguments
 
@@ -30,7 +31,7 @@ using ..ExpressionAlgebraModule: declare_operator_alias
 - `evaluate_on`: A list of external functions to evaluate explicitly when encountered.
 - `eval_module`: An optional `Module` used to resolve symbols and calls that are not operators or variables. Symbols are looked up as constants; calls whose arguments all parse to constants are evaluated eagerly.
 - `expression_type`: The type of the resulting expression. Defaults to `Expression`.
-- `node_type`: The type of the nodes in the resulting expression tree. Defaults to `default_node_type(expression_type)`.
+- `node_type`: The type of the nodes in the resulting expression tree, including interpolated nodes. Defaults to `default_node_type(expression_type)`.
 - `binary_operators`: Convenience syntax for creating an `OperatorEnum`.
 - `unary_operators`: Convenience syntax for creating an `OperatorEnum`.
 
@@ -185,7 +186,7 @@ end
         end
         throw(
             ArgumentError(
-                "Unrecognized argument: `$kw`. The available arguments are `operators`, `variable_names`, `node_type`, `expression_type`, `evaluate_on`, `eval_module`, and `extra_metadata`.",
+                "Unrecognized argument: `$kw`. The available arguments are `operators`, `variable_names`, `node_type`, `expression_type`, `evaluate_on`, `eval_module`, `extra_metadata`, `binary_operators`, and `unary_operators`.",
             ),
         )
     end
@@ -216,10 +217,20 @@ end
     )
 end
 
-_replace_imaginary_unit_symbol(ex) = ex
-@unstable _replace_imaginary_unit_symbol(ex::Symbol) = ex === :im ? im : ex
-@unstable function _replace_imaginary_unit_symbol(ex::Expr)
-    args = map(_replace_imaginary_unit_symbol, ex.args)
+_normalize_expression_for_parse(ex, variable_names) = ex
+@unstable function _normalize_expression_for_parse(ex::Symbol, variable_names)
+    variable_names !== nothing && string(ex) in variable_names && return ex
+    ex === :im && return im
+    ex === :NaN && return NaN
+    ex === :Inf && return Inf
+    return ex
+end
+@unstable function _normalize_expression_for_parse(ex::Expr, variable_names)
+    args = map(arg -> _normalize_expression_for_parse(arg, variable_names), ex.args)
+    if ex.head == :call && length(args) == 2 && args[2] isa Real && !isfinite(args[2])
+        first(args) === :- && return -args[2]
+        first(args) === :+ && return args[2]
+    end
     # Fold constant arithmetic involving the imaginary unit, so that the
     # normalized string form of a complex constant (`a + b*im`) parses back
     # into a single constant leaf:
@@ -238,16 +249,7 @@ _replace_imaginary_unit_symbol(ex) = ex
     return Expr(ex.head, args...)
 end
 
-@unstable function _normalize_expression_for_parse(
-    ex, variable_names::Union{AbstractVector{<:AbstractString},Nothing}
-)
-    if variable_names !== nothing && ("im" in variable_names)
-        return ex
-    end
-    return _replace_imaginary_unit_symbol(ex)
-end
-
-"""Parse an expression Julia `Expr` object."""
+"""Parse a Julia `Expr` object. Numeric literals include `NaN`, `Inf`, and `-Inf`."""
 @unstable function parse_expression(
     ex;
     operators::Union{AbstractOperatorEnum,Nothing}=nothing,
@@ -304,7 +306,8 @@ Throws appropriate errors for ambiguous or missing matches.
 
     for arity in 1:length(operators.ops)
         for op in operators.ops[arity]
-            if nameof(op) == func_symbol
+            name = op isa Broadcast.BroadcastFunction ? Symbol(get_op_name(op)) : nameof(op)
+            if name == func_symbol
                 push!(matches, (op, arity))
             end
         end
@@ -383,6 +386,12 @@ end
     eval_module::Union{Nothing,Module};
     kws...,
 ) where {N<:AbstractExpressionNode,E<:AbstractExpression}
+    if ex.head == :. &&
+        length(ex.args) == 2 &&
+        ex.args[2] isa Expr &&
+        ex.args[2].head == :tuple
+        ex = Expr(:call, Symbol(string(ex.args[1], '.')), ex.args[2].args...)
+    end
     ex.head != :call && throw(
         ArgumentError(
             "Unrecognized expression type: `Expr(:$(ex.head), ...)`. " *
@@ -553,6 +562,7 @@ end
     eval_module::Union{Nothing,Module};
     kws...,
 )
+    ex isa AbstractExpressionNode && return convert(node_type, ex)
     return parse_leaf(ex, variable_names, node_type, expression_type; eval_module, kws...)
 end
 
@@ -590,8 +600,6 @@ end
             )
         end
         return node_type(; feature=i::Int)
-    elseif ex isa AbstractExpressionNode
-        return ex
     else
         return node_type(; val=ex)
     end

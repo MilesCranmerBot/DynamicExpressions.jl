@@ -41,15 +41,14 @@ end
     end
 end
 
-const OP_NAME_CACHE = (; x=Dict{UInt64,String}(), lock=Threads.SpinLock())
+const OP_NAME_CACHE = (; x=IdDict{Any,String}(), lock=Threads.SpinLock())
 
 function get_op_name(op::F) where {F}
-    h = hash(op)
     lock(OP_NAME_CACHE.lock)
     try
         cache = OP_NAME_CACHE.x
-        if haskey(cache, h)
-            return cache[h]
+        if haskey(cache, op)
+            return cache[op]
         end
         op_s = if op isa Broadcast.BroadcastFunction
             base_op_s = string(op.f)
@@ -63,7 +62,7 @@ function get_op_name(op::F) where {F}
         else
             string(op)
         end
-        cache[h] = op_s
+        cache[op] = op_s
         return op_s
     finally
         unlock(OP_NAME_CACHE.lock)
@@ -107,12 +106,24 @@ function string_variable(feature, variable_names)
     end
 end
 
+# Julia, Python, and SymPy all parse `-a ^ b` as `-(a ^ b)`, so signed bases need brackets.
+@inline function needs_base_brackets(op, base)
+    is_pow = last(op) == '^' && (length(op) == 1 || (length(op) == 2 && first(op) == '.'))
+    return is_pow && !isempty(base) && first(base) in ('-', '+')
+end
+
 # Vector of chars is faster than strings, so we use that.
 function combine_op_with_inputs(op, args::Vararg{Any,D})::Vector{Char} where {D}
     if D == 2 && (first(op) in ('+', '-', '*', '/', '^', '.', '>', '<', '=') || op == "!=")
         # "(l op r)"
         out = ['(']
-        append!(out, args[1])
+        if needs_base_brackets(op, args[1])
+            push!(out, '(')
+            append!(out, args[1])
+            push!(out, ')')
+        else
+            append!(out, args[1])
+        end
         push!(out, ' ')
         append!(out, op)
         push!(out, ' ')
