@@ -40,6 +40,13 @@ Base.propertynames(x::Metadata) = propertynames(unpack_metadata(x))
 end
 Base.show(io::IO, x::Metadata) = print(io, "Metadata(", unpack_metadata(x), ")")
 @inline _copy(x) = copy(x)
+@inline _copy(x::AbstractArray{T}) where {T} =
+    isbitstype(T) || T === String ? copy(x) : map(_copy, x)
+@inline function _copy(x::Dict)
+    out = copy(x)
+    map!(_copy, values(out))
+    return out
+end
 @inline _copy(x::NamedTuple) = copy_named_tuple(x)
 @inline _copy(::Nothing) = nothing
 @inline function copy_named_tuple(nt::NamedTuple)
