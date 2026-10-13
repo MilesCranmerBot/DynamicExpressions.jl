@@ -3,6 +3,16 @@ using Random
 using Test
 using Zygote
 
+@testset "Constructor degree inference" begin
+    for D in (1, 3), N in (Node, GraphNode)
+        x = N{Float64,D}(; feature=1)
+        for cs in ((x,), ntuple(_ -> x, D), [x])
+            n = N(; op=1, children=cs)
+            @test typeof(n) === typeof(x)
+            @test get_children(n, length(cs)) == Tuple(cs)
+        end
+    end
+end
 operators = OperatorEnum(; binary_operators=[+, -, *, /], unary_operators=[cos, sin]);
 x1, x2, x3 = (i -> Node(Float64; feature=i)).(1:3)
 tree = cos(x1 * 3.2 - 5.8) * 0.2 - 0.5 * x2 * x3 * x3 + 0.9 / (x1 * x1 + 1);
