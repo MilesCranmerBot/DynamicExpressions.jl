@@ -159,7 +159,6 @@ function get_scalar_constants(e::AbstractStructuredExpression)
     refs = map(c_ref -> (; n=length(first(c_ref)), ref=last(c_ref)), consts_and_refs)
     return flat_constants, refs
 end
-"""Replace all member scalar constants using an exact-length input."""
 function set_scalar_constants!(e::AbstractStructuredExpression, constants, refs)
     length(constants) != sum(r -> r.n, refs) && throw(
         DimensionMismatch(

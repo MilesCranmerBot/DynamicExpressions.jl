@@ -265,7 +265,6 @@ function get_scalar_constants(ex::ParametricExpression{T}) where {T}
     refs = (; constant_refs, parameter_refs=parameters, num_parameters, num_constants)
     return combined_scalars, refs
 end
-"""Replace all scalar constants using an exact-length input."""
 function set_scalar_constants!(ex::ParametricExpression{T}, x, refs) where {T}
     length(x) != refs.num_constants + refs.num_parameters && throw(
         DimensionMismatch(
