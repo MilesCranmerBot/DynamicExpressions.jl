@@ -267,7 +267,9 @@ function get_scalar_constants(ex::ParametricExpression{T}) where {T}
     refs = (; constant_refs, parameter_refs=parameters, num_parameters, num_constants)
     return combined_scalars, refs
 end
+"""Replace all scalar constants, allowing input to overlap parameter storage."""
 function set_scalar_constants!(ex::ParametricExpression{T}, x, refs) where {T}
+    x = Base.unalias(get_metadata(ex).parameters, x)
     # First, set the usual constants
     set_scalar_constants!(
         get_tree(ex), @view(x[1:(refs.num_constants)]), refs.constant_refs
