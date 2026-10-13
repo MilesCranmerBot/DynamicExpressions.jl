@@ -212,3 +212,9 @@ end
     @test res1 == [3]             # (2 × 1) → 1-element vector
     @test res2 == [4, 6]          # (2 × 2) → 2-element vector, Int→Float64 promotion
 end
+
+@testitem "Missing operator degree diagnostic" begin
+    using DynamicExpressions.ExpressionAlgebraModule: MissingOperatorError
+    x = Expression(Node{Float64}(; feature=1); operators=OperatorEnum(2 => (+, *)))
+    @test_throws MissingOperatorError clamp(x, 0.0, 1.0)
+end
