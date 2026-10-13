@@ -44,28 +44,27 @@ end
 const OP_NAME_CACHE = (; x=IdDict{Any,String}(), lock=Threads.SpinLock())
 
 function get_op_name(op::F) where {F}
+    # Only singleton callables have a fixed name, and caching them keeps nothing alive.
+    Base.issingletontype(F) || return _get_op_name(op)
     lock(OP_NAME_CACHE.lock)
     try
-        cache = OP_NAME_CACHE.x
-        if haskey(cache, op)
-            return cache[op]
-        end
-        op_s = if op isa Broadcast.BroadcastFunction
-            base_op_s = string(op.f)
-            if length(base_op_s) == 1 && first(base_op_s) in ('+', '-', '*', '/', '^')
-                # Like `.+`
-                string('.', base_op_s)
-            else
-                # Like `cos.`
-                string(base_op_s, '.')
-            end
-        else
-            string(op)
-        end
-        cache[op] = op_s
-        return op_s
+        return get!(() -> _get_op_name(op), OP_NAME_CACHE.x, op)
     finally
         unlock(OP_NAME_CACHE.lock)
+    end
+end
+function _get_op_name(op)
+    if op isa Broadcast.BroadcastFunction
+        base_op_s = string(op.f)
+        if length(base_op_s) == 1 && first(base_op_s) in ('+', '-', '*', '/', '^')
+            # Like `.+`
+            return string('.', base_op_s)
+        else
+            # Like `cos.`
+            return string(base_op_s, '.')
+        end
+    else
+        return string(op)
     end
 end
 function get_pretty_op_name(op::F) where {F}
