@@ -22,7 +22,7 @@ using ..StringsModule: get_op_name
 
 ## Arguments
 
-- `expr`: An expression to parse into an `AbstractExpression`. Both ordinary and broadcast function calls are supported.
+- `expr`: An expression to parse into an `AbstractExpression`.
 
 ## Keyword Arguments
 
