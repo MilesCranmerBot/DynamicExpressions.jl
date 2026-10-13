@@ -198,6 +198,19 @@ end
     @test result.minimum < 1e-5 && init_loss > 0.1
     @test result.minimizer.metadata.parameters ≈ true_parameters
 end
+@testitem "Parametric copies own mutable constant values" begin
+    using DynamicExpressions
+
+    tree = ParametricNode(; val=[1.0, 2.0])
+    ex = ParametricExpression(tree; operators=nothing, parameters=reshape([[3.0]], 1, 1))
+    for copied in (copy(tree), get_tree(copy(ex)))
+        @test copied !== tree
+        @test copied.val == tree.val
+        @test copied.val !== tree.val
+        copied.val[1] = 4.0
+        @test tree.val == [1.0, 2.0]
+    end
+end
 
 @testitem "Allowed empty operators in parametric expression" begin
     using DynamicExpressions: ParametricExpression, ParametricNode
