@@ -553,7 +553,6 @@ end
     eval_module::Union{Nothing,Module};
     kws...,
 )
-    ex isa AbstractExpressionNode && return convert(node_type, ex)
     return parse_leaf(ex, variable_names, node_type, expression_type; eval_module, kws...)
 end
 
@@ -591,6 +590,8 @@ end
             )
         end
         return node_type(; feature=i::Int)
+    elseif ex isa AbstractExpressionNode
+        return convert(node_type, ex)
     else
         return node_type(; val=ex)
     end
