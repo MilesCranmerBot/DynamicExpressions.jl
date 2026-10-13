@@ -642,3 +642,38 @@ end
         "NOPE * x1"; operators, variable_names=["x1"], node_type=Node{Float64}
     )
 end
+
+@testitem "Printing round-trips powers with signed bases" begin
+    using DynamicExpressions
+    using Test
+
+    operators = OperatorEnum(1 => (-,), 2 => (^, *); define_helper_functions=false)
+    variable_names = ["x1"]
+    x1 = Node{Float64}(; feature=1)
+    c(v) = Node{Float64}(; val=v)
+    neg(a) = Node(; op=1, children=(a,))
+    pow(a, b) = Node(; op=1, children=(a, b))
+    mul(a, b) = Node(; op=2, children=(a, b))
+
+    X = [3.0;;]
+    for (tree, expected_string, expected_value) in (
+        (pow(c(-2.0), x1), "(-2.0) ^ x1", -8.0),
+        (pow(neg(x1), c(2.0)), "(-(x1)) ^ 2.0", 9.0),
+        (neg(pow(x1, c(2.0))), "-(x1 ^ 2.0)", -9.0),
+        (pow(x1, c(-2.0)), "x1 ^ -2.0", 1 / 9),
+        (mul(c(-2.0), x1), "-2.0 * x1", -6.0),
+    )
+        s = string_tree(tree, operators; variable_names)
+        @test s == expected_string
+        @test only(tree(X, operators)) ≈ expected_value
+        parsed = parse_expression(s; operators, variable_names, node_type=Node{Float64})
+        @test parsed.tree == tree
+        @test only(parsed(X)) ≈ expected_value
+    end
+
+    broadcast_operators = OperatorEnum(
+        2 => (Base.BroadcastFunction(^),); define_helper_functions=false
+    )
+    @test string_tree(pow(c(-2.0), x1), broadcast_operators; variable_names) ==
+        "(-2.0) .^ x1"
+end
