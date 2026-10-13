@@ -30,7 +30,7 @@ using ..ExpressionAlgebraModule: declare_operator_alias
 - `evaluate_on`: A list of external functions to evaluate explicitly when encountered.
 - `eval_module`: An optional `Module` used to resolve symbols and calls that are not operators or variables. Symbols are looked up as constants; calls whose arguments all parse to constants are evaluated eagerly.
 - `expression_type`: The type of the resulting expression. Defaults to `Expression`.
-- `node_type`: The type of the nodes in the resulting expression tree. Defaults to `default_node_type(expression_type)`.
+- `node_type`: The type of the nodes in the resulting expression tree, including interpolated nodes. Defaults to `default_node_type(expression_type)`.
 - `binary_operators`: Convenience syntax for creating an `OperatorEnum`.
 - `unary_operators`: Convenience syntax for creating an `OperatorEnum`.
 
@@ -553,6 +553,7 @@ end
     eval_module::Union{Nothing,Module};
     kws...,
 )
+    ex isa AbstractExpressionNode && return convert(node_type, ex)
     return parse_leaf(ex, variable_names, node_type, expression_type; eval_module, kws...)
 end
 
@@ -590,8 +591,6 @@ end
             )
         end
         return node_type(; feature=i::Int)
-    elseif ex isa AbstractExpressionNode
-        return ex
     else
         return node_type(; val=ex)
     end
