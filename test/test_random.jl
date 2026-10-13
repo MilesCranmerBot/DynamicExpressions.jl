@@ -96,3 +96,14 @@ end
         NodeSampler(; tree, filter=_ -> false, weighting=_ -> 1.0)
     )
 end
+
+@testset "NodeSampler rejects negative and non-finite weights" begin
+    for weight in (-1.0, -Inf, Inf, NaN)
+        @test_throws "finite and nonnegative" rand(
+            NodeSampler(; tree, weighting=_ -> weight)
+        )
+    end
+    @test_throws ArgumentError rand(
+        NodeSampler(; tree, weighting=node -> node === x ? -1.0 : 1.0)
+    )
+end
