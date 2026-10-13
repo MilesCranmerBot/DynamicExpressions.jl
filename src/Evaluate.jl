@@ -268,6 +268,8 @@ function eval_tree_array(
         _is_loopvectorization_loaded(0) ||
             error("Please load the LoopVectorization.jl package to use this feature.")
     end
+    # Kernels read features without bounds checks.
+    foreach(t -> t.degree == 0 && !t.constant && checkbounds(cX, t.feature, :), tree)
 
     result = _eval_tree_array(tree, cX, operators, _eval_context)
     return (
