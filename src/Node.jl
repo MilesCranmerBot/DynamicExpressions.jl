@@ -230,11 +230,14 @@ end
 
 Replace all children of a node with the given tuple. If fewer children are
 provided than the node's maximum degree, remaining slots are filled with poison nodes.
+Providing more children than the maximum degree throws an ArgumentError.
 """
 @inline function set_children!(
     n::AbstractNode{D}, children::Union{Tuple,AbstractVector{<:AbstractNode{D}}}
 ) where {D}
     D2 = length(children)
+    D2 > D &&
+        throw(ArgumentError("Cannot store $D2 children in a node of maximum degree $D."))
     if D === D2
         n.children = ntuple(i -> _ensure_nullable(@inbounds(children[i])), Val(D))
     else
