@@ -3,7 +3,8 @@
 ## `Base`
 
 Various functions in `Base` are overloaded to treat an `AbstractNode` as a
-collection of its nodes.
+collection of its nodes. `copy_node` forwards keyword arguments to `copy` for
+expressions.
 
 ```@docs
 copy(tree::AbstractExpressionNode; break_sharing::Val=Val(false))
