@@ -80,7 +80,7 @@ function apply_operator(op::F, args::Vararg{Any,D}) where {F<:Function,D}
         throw(
             MissingOperatorError(
                 "Operator $op not found in operators for expression type " *
-                "$(E) with $(D)-degree operators $(operators[D])",
+                "$(E) with $(D)-degree operators $(length(operators) >= D ? operators[D] : ())",
             ),
         )
     end
