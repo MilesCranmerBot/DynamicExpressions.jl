@@ -126,7 +126,7 @@ end
 preserve_sharing(::Union{Type{<:ParametricNode},ParametricNode}) = false  # COV_EXCL_LINE
 function leaf_copy(t::ParametricNode{T}) where {T}
     if t.constant
-        return constructorof(typeof(t))(; val=copy_value(t.val))
+        return constructorof(typeof(t))(T; val=copy_value(t.val))
     elseif !t.is_parameter
         return constructorof(typeof(t))(T; feature=t.feature)
     else
