@@ -150,7 +150,7 @@ macro maybe_setup_workload(mode, ex)
         elseif $(esc(mode)) == :precompile
             $(esc(precompile_ex))
         else
-            error("Invalid value for mode: " * show($(esc(mode))))
+            error("Invalid value for mode: " * repr($(esc(mode))))
         end
     end
 end
@@ -165,7 +165,7 @@ macro maybe_compile_workload(mode, ex)
         elseif $(esc(mode)) == :precompile
             $(esc(precompile_ex))
         else
-            error("Invalid value for mode: " * show($(esc(mode))))
+            error("Invalid value for mode: " * repr($(esc(mode))))
         end
     end
 end
