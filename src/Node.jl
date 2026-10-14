@@ -3,6 +3,7 @@ module NodeModule
 using DispatchDoctor: @unstable
 
 import ..UtilsModule: deprecate_varmap, Undefined, Nullable
+import ..ValueInterfaceModule: copy_value
 
 const DEFAULT_NODE_TYPE = Float32
 const DEFAULT_MAX_DEGREE = 2
@@ -230,7 +231,6 @@ end
 
 Replace all children of a node with the given tuple. If fewer children are
 provided than the node's maximum degree, remaining slots are filled with poison nodes.
-Providing more children than the maximum degree throws an ArgumentError.
 """
 @inline function set_children!(
     n::AbstractNode{D}, children::Union{Tuple,AbstractVector{<:AbstractNode{D}}}
@@ -350,6 +350,7 @@ include("base.jl")
 @inline function (::Type{N})(
     ::Type{T1}=Undefined; val=nothing, feature=nothing, op=nothing, l=nothing, r=nothing, children=nothing, allocator::F=default_allocator,
 ) where {T1,N<:AbstractExpressionNode{T} where T,F}
+    isnothing(l) && !isnothing(r) && throw(ArgumentError("The r child requires an l child."))
     _children = if !isnothing(l) && isnothing(r)
         @assert isnothing(children)
         (l,)

@@ -133,3 +133,9 @@ end
         @test N(x) === x
     end
 end
+
+@testitem "Right child requires left child" begin
+    x = Node{Float64}(; feature=1)
+    @test_throws ArgumentError Node{Float64}(; r=x)
+    @test_throws ArgumentError Node{Float64}(; op=1, r=x, children=(x,))
+end

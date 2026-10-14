@@ -591,7 +591,7 @@ end
         end
         return node_type(; feature=i::Int)
     elseif ex isa AbstractExpressionNode
-        return ex
+        return convert(node_type, ex)
     else
         return node_type(; val=ex)
     end

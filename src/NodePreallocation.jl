@@ -8,6 +8,7 @@ using ..NodeModule:
     branch_copy,
     set_node!,
     set_children!
+using ..ValueInterfaceModule: copy_value
 
 """
     allocate_container(prototype::AbstractExpressionNode, n=nothing)
@@ -51,6 +52,7 @@ function copy_into!(
 end
 function leaf_copy_into!(dest::N, src::N) where {N<:AbstractExpressionNode}
     set_node!(dest, src)
+    src.constant && (dest.val = copy_value(src.val))
     return dest
 end
 function branch_copy_into!(
