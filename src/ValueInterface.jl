@@ -164,10 +164,10 @@ vi_components = (
         pack_scalar_constants! = "packs scalar constants into an array" => _check_pack_scalar_constants!,
         unpack_scalar_constants = "unpacks scalar constants from an array" => _check_unpack_scalar_constants,
         count_scalar_constants = "counts how many scalar constants the value has" => _check_count_scalar_constants,
+        copy_value = "copies the value without sharing mutable state" => _check_copy_value,
     ),
     optional = (
         invalid_value = "constructs an invalid value of the same type" => _check_invalid_value,
-        copy_value = "copies the value without sharing mutable state" => _check_copy_value,
     )
 )
 vi_description = (
