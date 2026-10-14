@@ -112,7 +112,11 @@ function combine_op_with_inputs(op, args::Vararg{Any,D})::Vector{Char} where {D}
     if D == 2 && (first(op) in ('+', '-', '*', '/', '^', '.', '>', '<', '=') || op == "!=")
         # "(l op r)"
         out = ['(']
+        # `-a ^ b` parses as `-(a ^ b)`, so a negative base needs brackets.
+        signed_base = last(op) == '^' && first(args[1]) == '-'
+        signed_base && push!(out, '(')
         append!(out, args[1])
+        signed_base && push!(out, ')')
         push!(out, ' ')
         append!(out, op)
         push!(out, ' ')
