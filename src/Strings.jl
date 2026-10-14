@@ -1,6 +1,6 @@
 module StringsModule
 
-using ..UtilsModule: deprecate_varmap
+using ..UtilsModule: deprecate_varmap, PerTaskCache
 using ..OperatorEnumModule: AbstractOperatorEnum
 using ..NodeModule: AbstractExpressionNode, tree_mapreduce, max_degree
 
@@ -41,17 +41,12 @@ end
     end
 end
 
-const OP_NAME_CACHE = (; x=IdDict{Any,String}(), lock=Threads.SpinLock())
+const OP_NAME_CACHE = PerTaskCache{IdDict{Any,String}}()
 
 function get_op_name(op::F) where {F}
     # Only singleton callables have a fixed name, and caching them keeps nothing alive.
     Base.issingletontype(F) || return _get_op_name(op)
-    lock(OP_NAME_CACHE.lock)
-    try
-        return get!(() -> _get_op_name(op), OP_NAME_CACHE.x, op)
-    finally
-        unlock(OP_NAME_CACHE.lock)
-    end
+    return get!(() -> _get_op_name(op), OP_NAME_CACHE[], op)
 end
 function _get_op_name(op)
     if op isa Broadcast.BroadcastFunction
