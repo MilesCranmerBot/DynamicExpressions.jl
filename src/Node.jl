@@ -3,6 +3,7 @@ module NodeModule
 using DispatchDoctor: @unstable
 
 import ..UtilsModule: deprecate_varmap, Undefined, Nullable
+import ..ValueInterfaceModule: copy_value
 
 const DEFAULT_NODE_TYPE = Float32
 const DEFAULT_MAX_DEGREE = 2

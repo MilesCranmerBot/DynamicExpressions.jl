@@ -500,7 +500,7 @@ function copy_node(
 end
 function leaf_copy(t::N) where {T,N<:AbstractExpressionNode{T}}
     if t.constant
-        return constructorof(N)(; val=t.val)
+        return constructorof(N)(T; val=copy_value(t.val::T))
     else
         return constructorof(N)(T; feature=t.feature)
     end
