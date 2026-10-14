@@ -45,7 +45,7 @@ const OP_NAME_CACHE = PerTaskCache{IdDict{Any,String}}()
 
 function get_op_name(op::F) where {F}
     # Only singleton callables have a fixed name, and caching them keeps nothing alive.
-    Base.issingletontype(F) || return _get_op_name(op)
+    !Base.issingletontype(F) && return _get_op_name(op)
     return get!(() -> _get_op_name(op), OP_NAME_CACHE[], op)
 end
 function _get_op_name(op)
