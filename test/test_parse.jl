@@ -677,3 +677,25 @@ end
     @test string_tree(pow(c(-2.0), x1), broadcast_operators; variable_names) ==
         "(-2.0) .^ x1"
 end
+
+@testitem "StringsParse interpolated nodes honor node_type" begin
+    using DynamicExpressions
+    using Test
+    operators = OperatorEnum(2 => (+,); define_helper_functions=false)
+    tree = Node{Float64}(; op=1, children=(Node{Float64}(; feature=1), Node(; val=2.0)))
+    for node_type in (GraphNode, GraphNode{Float32}, Node{Float32})
+        parsed = parse_expression(tree; operators, variable_names=["x1"], node_type)
+        @test parsed.tree isa node_type
+        @test all(n -> n isa node_type, parsed.tree)
+        @test parsed.tree == convert(node_type, tree)
+    end
+    @test parse_expression(tree; operators, node_type=Node{Float64}).tree === tree
+    parsed = @parse_expression(
+        $tree + x1,
+        operators = operators,
+        variable_names = ["x1"],
+        node_type = GraphNode{Float64}
+    )
+    @test parsed.tree isa GraphNode{Float64}
+    @test all(n -> n isa GraphNode{Float64}, parsed.tree)
+end
