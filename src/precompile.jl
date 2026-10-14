@@ -67,9 +67,9 @@ function test_all_combinations(; binary_operators, unary_operators, turbo, types
         end
 
         # Both operators
-        for i in eachindex(binary_operators),
-            j1 in eachindex(unary_operators),
-            j2 in eachindex(unary_operators),
+        for i in eachindex(binops),
+            j1 in eachindex(unaops),
+            j2 in eachindex(unaops),
             l in (x, c),
             r in (x, c)
 
