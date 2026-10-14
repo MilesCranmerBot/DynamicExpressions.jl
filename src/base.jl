@@ -509,8 +509,6 @@ function branch_copy(t::N, children::Vararg{Any,M}) where {T,N<:AbstractExpressi
     return constructorof(N)(T; op=t.op, children)
 end
 
-@inline copy_value(x::T) where {T} = isbitstype(T) ? x : deepcopy(x)
-
 """
     copy(tree::AbstractExpressionNode; break_sharing::Val=Val(false))
 

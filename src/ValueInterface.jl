@@ -73,6 +73,14 @@ Note that this will return 1 for scalars.
 """
 @inline count_scalar_constants(::T) where {T<:Number} = 1  # COV_EXCL_LINE
 
+"""
+    copy_value(value)
+
+Copy `value` so that the copy shares no mutable state with it.
+Used when copying constant nodes. Defaults to `deepcopy` for non-isbits types.
+"""
+@inline copy_value(x::T) where {T} = isbitstype(T) ? x : deepcopy(x)
+
 ################################################################################
 # Interface.jl integration #####################################################
 ################################################################################
@@ -143,6 +151,9 @@ function _check_count_scalar_constants(x)
     return count_scalar_constants(x) isa Int &&
            (!(x isa Number) || count_scalar_constants(x) == 1)
 end
+function _check_copy_value(x)
+    return copy_value(x) isa typeof(x)
+end
 
 #! format: off
 vi_components = (
@@ -156,6 +167,7 @@ vi_components = (
     ),
     optional = (
         invalid_value = "constructs an invalid value of the same type" => _check_invalid_value,
+        copy_value = "copies the value without sharing mutable state" => _check_copy_value,
     )
 )
 vi_description = (

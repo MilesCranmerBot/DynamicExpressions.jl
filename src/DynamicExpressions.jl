@@ -36,6 +36,7 @@ import .ValueInterfaceModule:
     get_number_type,
     pack_scalar_constants!,
     unpack_scalar_constants,
+    copy_value,
     ValueInterface
 @reexport import .NodeModule:
     AbstractNode,

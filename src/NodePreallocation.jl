@@ -7,8 +7,8 @@ using ..NodeModule:
     leaf_copy,
     branch_copy,
     set_node!,
-    copy_value,
     set_children!
+using ..ValueInterfaceModule: copy_value
 
 """
     allocate_container(prototype::AbstractExpressionNode, n=nothing)
