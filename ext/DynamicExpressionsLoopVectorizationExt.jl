@@ -119,7 +119,7 @@ function deg2_branch0_eval(
     op::F,
     branch_op::F2,
     ::Val{side},
-    eval_context::EvalContext{true,false},
+    eval_context::EvalContext{true},
 ) where {T<:Number,F,F2,side}
     branch = side === :left ? get_child(tree, 1) : get_child(tree, 2)
     leaf1 = side === :left ? get_child(branch, 1) : get_child(tree, 1)

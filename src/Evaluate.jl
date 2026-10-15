@@ -686,7 +686,7 @@ function deg1_l2_ll0_lr0_eval(
     cX::AbstractMatrix{T},
     op::F,
     op_l::F2,
-    eval_context::EvalContext{false,false},
+    eval_context::EvalContext{false},
 ) where {T,F,F2}
     index_style = IndexStyle(typeof(cX))
     if get_child(get_child(tree, 1), 1).constant &&
@@ -757,7 +757,7 @@ function deg1_l1_ll0_eval(
     cX::AbstractMatrix{T},
     op::F,
     op_l::F2,
-    eval_context::EvalContext{false,false},
+    eval_context::EvalContext{false},
 ) where {T,F,F2}
     index_style = IndexStyle(typeof(cX))
     if get_child(get_child(tree, 1), 1).constant
@@ -811,7 +811,7 @@ function deg2_branch0_eval(
     op::F,
     branch_op::F2,
     ::Val{side},
-    eval_context::EvalContext{false,false},
+    eval_context::EvalContext{false},
 ) where {T<:Number,F,F2,side}
     index_style = IndexStyle(typeof(cX))
     branch = side === :left ? get_child(tree, 1) : get_child(tree, 2)
@@ -866,7 +866,7 @@ function deg2_l0_r0_eval(
     tree::AbstractExpressionNode{T},
     cX::AbstractMatrix{T},
     op::F,
-    eval_context::EvalContext{false,false},
+    eval_context::EvalContext{false},
 ) where {T,F}
     index_style = IndexStyle(typeof(cX))
     if get_child(tree, 1).constant && get_child(tree, 2).constant
@@ -929,7 +929,7 @@ function deg2_l0_eval(
     cumulator::AbstractVector{T},
     cX::AbstractArray{T},
     op::F,
-    eval_context::EvalContext{false,false},
+    eval_context::EvalContext{false},
 ) where {T,F}
     index_style = IndexStyle(typeof(cX))
     if get_child(tree, 1).constant
@@ -959,7 +959,7 @@ function deg2_r0_eval(
     cumulator::AbstractVector{T},
     cX::AbstractArray{T},
     op::F,
-    eval_context::EvalContext{false,false},
+    eval_context::EvalContext{false},
 ) where {T,F}
     index_style = IndexStyle(typeof(cX))
     if get_child(tree, 2).constant

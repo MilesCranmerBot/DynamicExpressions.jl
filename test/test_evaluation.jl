@@ -500,3 +500,19 @@ end
 
     # Matrix{Int} promotion path is already exercised above
 end
+
+@testitem "bumper=true evaluates like bumper=false" begin
+    using DynamicExpressions, LoopVectorization
+
+    operators = OperatorEnum(1 => (cos,), 2 => (+, *))
+    x1, x2 = Node{Float64}(; feature=1), Node{Float64}(; feature=2)
+    X = [1.0 2.0 3.0; 4.0 5.0 6.0]
+    for tree in (x1 + x2, cos(x1 * 2.0), (x1 * x2) + x1, cos(x1) + cos(x2)),
+        turbo in (false, true)
+
+        expected = eval_tree_array(tree, X, operators; eval_context=EvalContext(; turbo))
+        @test eval_tree_array(
+            tree, X, operators; eval_context=EvalContext(; turbo, bumper=true)
+        ) == expected
+    end
+end
