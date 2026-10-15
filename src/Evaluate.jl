@@ -8,7 +8,7 @@ import ..StringsModule: string_tree
 import ..OperatorEnumModule: AbstractOperatorEnum, OperatorEnum, GenericOperatorEnum
 import ..UtilsModule: fill_similar, counttuple, ResultOk
 import ..NodeUtilsModule: is_constant
-import ..ExtensionInterfaceModule: bumper_eval_tree_array, _is_loopvectorization_loaded
+import ..ExtensionInterfaceModule: _is_loopvectorization_loaded
 import ..ValueInterfaceModule: is_valid, is_valid_array
 
 const OPERATOR_LIMIT_BEFORE_SLOWDOWN = 15
@@ -136,7 +136,7 @@ This holds evaluation policy and call-scoped mutable state.
 
 - `turbo::Val{T}=Val(false)`: If `Val{true}`, use LoopVectorization.jl for faster
     evaluation.
-- `bumper::Val{B}=Val(false)`: If `Val{true}`, use Bumper.jl for faster evaluation.
+- `bumper::Val{B}=Val(false)`: Deprecated; has no effect.
 - `early_exit::Val{E}=Val(true)`: If `Val{true}`, any element of any step becoming
     `NaN` or `Inf` will terminate the computation. For `eval_tree_array`, this will
     result in the second return value, the completion flag, being `false`. For 
@@ -173,10 +173,6 @@ end
     v_bumper = _to_bool_val(bumper)
     v_early_exit = _to_bool_val(early_exit)
     v_use_fused = _to_bool_val(use_fused)
-
-    if v_bumper isa Val{true}
-        @assert buffer === nothing
-    end
 
     return EvalContext(v_turbo, v_bumper, v_early_exit, buffer, v_use_fused)
 end
@@ -285,21 +281,15 @@ function eval_tree_array(
     _deprecated_kws...,
 ) where {T}
     _eval_context = _process_deprecated_kws(eval_context, _deprecated_kws)
-    if _eval_context.turbo isa Val{true} || _eval_context.bumper isa Val{true}
+    if _eval_context.turbo isa Val{true}
         @assert T in (Float32, Float64)
     end
     if _eval_context.turbo isa Val{true}
         _is_loopvectorization_loaded(0) ||
             error("Please load the LoopVectorization.jl package to use this feature.")
     end
-    if (_eval_context.turbo isa Val{true} || _eval_context.bumper isa Val{true}) &&
-        !(T <: Number)
-        error(
-            "Bumper and LoopVectorization features are only compatible with numeric element types",
-        )
-    end
-    if _eval_context.bumper isa Val{true}
-        return bumper_eval_tree_array(tree, cX, operators, _eval_context)
+    if _eval_context.turbo isa Val{true} && !(T <: Number)
+        error("LoopVectorization features are only compatible with numeric element types")
     end
 
     result = _eval_tree_array(tree, cX, operators, _eval_context)
