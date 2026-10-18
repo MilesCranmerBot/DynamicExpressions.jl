@@ -286,9 +286,6 @@ function eval_tree_array(
         _is_loopvectorization_loaded(0) ||
             error("Please load the LoopVectorization.jl package to use this feature.")
     end
-    if _eval_context.turbo isa Val{true} && !(T <: Number)
-        error("LoopVectorization features are only compatible with numeric element types")
-    end
 
     result = _eval_tree_array(tree, cX, operators, _eval_context)
     return (
