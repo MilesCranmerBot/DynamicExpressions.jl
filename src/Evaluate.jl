@@ -365,7 +365,7 @@ function deg0_eval(
     if tree.constant
         return ResultOk(
             get_filled_array(eval_context.buffer, tree.val, cX, axes(cX, 2)),
-            is_valid(tree.val) || eval_context.early_exit isa Val{false},
+            eval_context.early_exit isa Val{false} || is_valid(tree.val),
         )
     else
         return ResultOk(get_feature_array(eval_context.buffer, cX, tree.feature), true)
