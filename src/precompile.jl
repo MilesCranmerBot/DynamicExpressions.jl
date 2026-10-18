@@ -182,6 +182,21 @@ function precompile_operator_mappings()
     return nothing
 end
 
+function test_functions_on_expressions(::Type{T}, operators) where {T}
+    # Users call these from untyped code, so precompile the dynamically dispatched methods
+    # rather than versions inlined into this function.
+    variable_names = ["x1", "x2"]
+    x1 = Base.inferencebarrier(Expression(Node{T}(; feature=1); operators, variable_names))
+    x2 = Base.inferencebarrier(Expression(Node{T}(; feature=2); operators, variable_names))
+    ex = x1 * cos(x2 - T(3.2))
+    ex = 2.0 * sin(ex) / 1 + (x1 - 0.5) + (1 - x2)
+    ex = copy(ex)
+    repr(ex)
+    string_tree(ex; pretty=true)
+    string_tree(Base.inferencebarrier(Expression(Node{T}(; feature=1); operators)))
+    return nothing
+end
+
 macro maybe_setup_workload(mode, ex)
     precompile_ex = Expr(
         :macrocall, Symbol("@setup_workload"), LineNumberNode(@__LINE__), ex
@@ -239,6 +254,7 @@ function do_precompilation(; mode=:precompile)
         for T in types
             @maybe_compile_workload mode begin
                 test_functions_on_trees(T, operators)
+                test_functions_on_expressions(T, operators)
             end
         end
     end
