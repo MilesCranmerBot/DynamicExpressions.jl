@@ -232,7 +232,7 @@ end
 function do_precompilation(; mode=:precompile)
     @maybe_setup_workload mode begin
         binary_operators = ((+, -, *, /),)
-        unary_operators = ((sin, cos),)
+        unary_operators = ((sin, cos), (exp, log, sqrt, abs))
         turbo = (Val(false),)
         types = (Float32, Float64)
         @maybe_compile_workload mode begin
