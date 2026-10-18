@@ -322,8 +322,10 @@ function set_children!(
     node::ArenaNode{T,D}, children::Union{Tuple,AbstractVector{<:AbstractNode{D}}}
 ) where {T,D}
     D2 = length(children)
+    D2 > D &&
+        throw(ArgumentError("Cannot store $D2 children in a node of maximum degree $D."))
     idxs = _zero_children(Val(D))
-    @inbounds for i in 1:min(D, D2)
+    @inbounds for i in 1:D2
         child = children[i]
         if child isa Nullable
             child.null && continue

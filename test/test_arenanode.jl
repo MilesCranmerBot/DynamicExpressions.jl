@@ -240,6 +240,10 @@ end
 
     bad_children = (Nullable(true, Node{Float64}(; val=0.0)), Node{Float32}(; val=1.0f0))
     @test_throws ArgumentError set_children!(rewritten, bad_children)
+
+    leaf = convert(ArenaNode{Float64}, get_tree(x1))
+    @test_throws ArgumentError set_children!(rewritten, (leaf, leaf, leaf))
+    @test string_tree(rewritten, operators) == "sin(x1 * 2.0)"
 end
 
 @testitem "ArenaNode keyword constructor" setup = [ExprLeaves] begin
