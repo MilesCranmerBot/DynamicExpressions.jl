@@ -103,8 +103,11 @@ function get_feature_array(buffer::ArrayBuffer, X::AbstractMatrix, feature::Inte
     return out
 end
 
-@inline first_feature_index(X::AbstractArray, feature::Integer) =
-    firstindex(X) + feature - firstindex(X, 1)
+# Kernels read features without bounds checks, so check each feature row once here.
+@inline function first_feature_index(X::AbstractArray, feature::Integer)
+    checkbounds(X, feature, :)
+    return firstindex(X) + feature - firstindex(X, 1)
+end
 
 @inline feature_at(X, input_index, feature, j, ::IndexLinear) = @inbounds X[input_index]
 @inline feature_at(X, input_index, feature, j, _) = @inbounds X[feature, j]
@@ -268,8 +271,6 @@ function eval_tree_array(
         _is_loopvectorization_loaded(0) ||
             error("Please load the LoopVectorization.jl package to use this feature.")
     end
-    # Kernels read features without bounds checks.
-    foreach(t -> t.degree == 0 && !t.constant && checkbounds(cX, t.feature, :), tree)
 
     result = _eval_tree_array(tree, cX, operators, _eval_context)
     return (
@@ -370,6 +371,7 @@ function deg0_eval(
             eval_context.early_exit isa Val{false} || is_valid(tree.val),
         )
     else
+        checkbounds(cX, tree.feature, :)
         return ResultOk(get_feature_array(eval_context.buffer, cX, tree.feature), true)
     end
 end
