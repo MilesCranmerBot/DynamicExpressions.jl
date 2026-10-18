@@ -112,6 +112,16 @@ end
     @test string_tree(out) == "x + 5.0"
 end
 
+@testitem "Deprecated combine_operators" begin
+    using DynamicExpressions
+
+    operators = OperatorEnum(; binary_operators=[+, -])
+    ex = @parse_expression((2.0 + x) + 3.0, operators = operators, variable_names = [:x])
+    expected = get_tree(combine_operators!(copy(ex)))
+    @test get_tree(@test_deprecated(combine_operators(copy(ex)))) == expected
+    @test @test_deprecated(combine_operators(get_tree(copy(ex)), operators)) == expected
+end
+
 @testitem "Nested repeat operators in Expression parsing" begin
     using DynamicExpressions
 
