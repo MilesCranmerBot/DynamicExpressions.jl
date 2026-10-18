@@ -39,17 +39,10 @@ Base.propertynames(x::Metadata) = propertynames(unpack_metadata(x))
     return getproperty(unpack_metadata(x), f)
 end
 Base.show(io::IO, x::Metadata) = print(io, "Metadata(", unpack_metadata(x), ")")
-@inline _copy(x) = copy(x)
-@inline _copy(x::AbstractArray) = _copy_nested.(x)
-@inline function _copy(x::Dict)
-    out = copy(x)
-    map!(_copy_nested, values(out))
-    return out
-end
-@inline _copy_nested(x) = x
-@inline _copy_nested(x::Union{AbstractArray,Dict}) = _copy(x)
+@inline _copy(x) = isbits(x) ? x : deepcopy(x)
+# Operators stay shared: they can hold closures over user state.
+@inline _copy(x::AbstractOperatorEnum) = x
 @inline _copy(x::NamedTuple) = copy_named_tuple(x)
-@inline _copy(::Nothing) = nothing
 @inline function copy_named_tuple(nt::NamedTuple)
     return NamedTuple{keys(nt)}(map(_copy, values(nt)))
 end

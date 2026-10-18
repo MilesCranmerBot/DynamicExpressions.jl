@@ -457,6 +457,34 @@ end
     @test get_operators(new_ex2, nothing) == new_operators
 end
 
+@testitem "Expression copy deep-copies metadata except operators" begin
+    using DynamicExpressions
+    using DynamicExpressions: get_metadata
+
+    struct Payload
+        values::Vector{Vector{Float64}}
+    end
+    weighted_add = let weights = [1.0]
+        (x, y) -> weights[1] * (x + y)
+    end
+    operators = OperatorEnum(2 => (weighted_add,); define_helper_functions=false)
+    ex = Expression(
+        Node{Float64}(; feature=1);
+        operators,
+        variable_names=["x"],
+        payload=Payload([[2.0]]),
+        state=Dict("weights" => [1.0, 2.0]),
+    )
+    copied = get_metadata(copy(ex))
+    @test copied.operators === operators
+    copied.payload.values[1][1] = 99.0
+    copied.state["weights"][1] = 99.0
+    copied.variable_names[1] = "y"
+    @test get_metadata(ex).payload.values == [[2.0]]
+    @test get_metadata(ex).state == Dict("weights" => [1.0, 2.0])
+    @test get_metadata(ex).variable_names == ["x"]
+end
+
 @testitem "New binary operators" begin
     using DynamicExpressions
 
@@ -514,58 +542,4 @@ end
     @test get_tree(shared) !== tree
     structured = StructuredExpression((; f=ex); structure=nt -> nt.f)
     @test copy_node(structured; break_sharing=Val(true)) isa StructuredExpression
-end
-
-@testitem "Expression metadata preserves copy methods" begin
-    using DynamicExpressions
-    using DynamicExpressions: get_metadata
-
-    struct CopyableMetadata
-        values::Vector{Float64}
-    end
-    const copies = Ref(0)
-    function Base.copy(x::CopyableMetadata)
-        copies[] += 1
-        return CopyableMetadata(copy(x.values))
-    end
-    weighted_add = let weights = [1.0]
-        (x, y) -> weights[1] * (x + y)
-    end
-    operators = OperatorEnum(2 => (weighted_add,); define_helper_functions=false)
-    ex = Expression(
-        Node{Float64}(; feature=1);
-        operators,
-        variable_names=["x"],
-        payload=CopyableMetadata([2.0]),
-    )
-    copied = copy(ex)
-    @test get_metadata(copied).operators === operators
-    @test copies[] == 1
-    @test get_metadata(copied).payload.values !== get_metadata(ex).payload.values
-end
-
-@testitem "Expression copy and nested metadata" begin
-    using DynamicExpressions
-    using DynamicExpressions: get_metadata
-
-    ex = Expression(
-        Node{Float64}(; feature=1);
-        payload=[[1.0, 2.0]],
-        state=Dict("weights" => [1.0, 2.0]),
-        labels=Dict("x" => "input"),
-        tags=[:a, :b],
-    )
-    copied = copy(ex)
-
-    copied_metadata = get_metadata(copied)
-    original_metadata = get_metadata(ex)
-    @test copied_metadata.payload !== original_metadata.payload
-    @test copied_metadata.payload[1] !== original_metadata.payload[1]
-    @test copied_metadata.state !== original_metadata.state
-    @test copied_metadata.state["weights"] !== original_metadata.state["weights"]
-
-    copied_metadata.payload[1][1] = 99.0
-    copied_metadata.state["weights"][1] = 99.0
-    @test original_metadata.payload == [[1.0, 2.0]]
-    @test original_metadata.state == Dict("weights" => [1.0, 2.0])
 end
