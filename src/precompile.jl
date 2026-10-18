@@ -140,6 +140,48 @@ function test_functions_on_trees(::Type{T}, operators) where {T}
     return nothing
 end
 
+"""Construct operator enums with helper functions, then restore the global state this sets."""
+function test_operator_enum_construction(unary_operators, binary_operators)
+    (; LATEST_OPERATORS, LATEST_OPERATORS_TYPE, LATEST_OPERATOR_MAPPING) =
+        OperatorEnumConstructionModule
+    latest_operators = LATEST_OPERATORS.x
+    latest_operators_type = LATEST_OPERATORS_TYPE.x
+    mapping = Dict(k => copy(v) for (k, v) in LATEST_OPERATOR_MAPPING)
+
+    # Hide the argument types, as user calls will dispatch at runtime too
+    pairs = Base.inferencebarrier((1 => unary_operators, 2 => binary_operators))
+    OperatorEnum(pairs...)
+    # Helper functions would define new methods for `GenericOperatorEnum`, so skip them
+    GenericOperatorEnum(pairs...; define_helper_functions=false)
+    precompile(GenericOperatorEnum, map(typeof, pairs))
+
+    LATEST_OPERATORS.x = latest_operators
+    LATEST_OPERATORS_TYPE.x = latest_operators_type
+    for k in collect(keys(LATEST_OPERATOR_MAPPING))
+        haskey(mapping, k) || delete!(LATEST_OPERATOR_MAPPING, k)
+    end
+    for (k, v) in mapping
+        merge!(empty!(LATEST_OPERATOR_MAPPING[k]), v)
+    end
+    return nothing
+end
+
+"""
+Precompile the runtime-dispatched calls that record operators in the global mappings.
+`@compile_workload` misses these because the predefined operators are extended first,
+outside any workload.
+"""
+function precompile_operator_mappings()
+    (; ALREADY_DEFINED_OPERATORS, OP_FIELDTYPE) = OperatorEnumConstructionModule
+    precompile(haskey, (Dict{Any,Bool}, Function))
+    for defined in values(ALREADY_DEFINED_OPERATORS.operator_enum[Number]),
+        func in keys(defined)
+
+        precompile(setindex!, (Dict{Any,OP_FIELDTYPE}, Int, typeof(func)))
+    end
+    return nothing
+end
+
 macro maybe_setup_workload(mode, ex)
     precompile_ex = Expr(
         :macrocall, Symbol("@setup_workload"), LineNumberNode(@__LINE__), ex
@@ -185,6 +227,10 @@ function do_precompilation(; mode=:precompile)
                 types=types,
             )
         end
+        @maybe_compile_workload mode begin
+            test_operator_enum_construction(unary_operators[1], binary_operators[1])
+        end
+        precompile_operator_mappings()
         operators = OperatorEnum(
             1 => unary_operators[1], 2 => binary_operators[1]; define_helper_functions=false
         )
