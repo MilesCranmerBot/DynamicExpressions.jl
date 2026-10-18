@@ -84,7 +84,8 @@ mutable struct Arena{T<:Number,D} <: AbstractVector{ArenaEntry{T,D}}
     end
 end
 
-# `Vector{E}(undef, n)` is the one Base constructor with an exact buffer size.
+# Not `sizehint!`: on Julia 1.12 it gives a 1-entry request 3 entries and grows a
+# 23-entry vector to 72, while `Vector{E}(undef, n)` allocates exactly `n`.
 _new_nodes(::Type{E}, capacity) where {E} = resize!(Vector{E}(undef, capacity), 0)
 
 # Single-entry pushes grow geometrically; subtree appends grow to the exact size.
