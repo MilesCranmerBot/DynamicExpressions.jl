@@ -784,6 +784,28 @@ end
     end
 end
 
+# Each leaf picks its constant by comparing the row index with a bound (`typemin` for a
+# constant, `typemax` for a feature) computed out of line, so LLVM cannot turn the test back
+# into the loop-invariant `leaf.constant` and unswitch the loop into one vectorized copy per
+# combination of leaf kinds, which multiplies the compile time of every operator pair.
+# Feature indices are `Int` because a `Union{Int,UInt16}` index is split inside the loop
+# and unswitched the same way.
+@noinline function branch0_leaves(
+    tree::AbstractExpressionNode{T}, ::Val{side}, ::Val{early_exit}
+) where {T,side,early_exit}
+    branch = side === :left ? get_child(tree, 1) : get_child(tree, 2)
+    leaves = if side === :left
+        (get_child(branch, 1), get_child(branch, 2), get_child(tree, 2))
+    else
+        (get_child(tree, 1), get_child(branch, 1), get_child(branch, 2))
+    end
+    ok = !(early_exit && any(leaf -> leaf.constant && !is_valid(leaf.val), leaves))
+    features = map(leaf -> leaf.constant ? 1 : Int(leaf.feature), leaves)
+    values = map(leaf -> leaf.constant ? leaf.val : zero(T), leaves)
+    bounds = map(leaf -> leaf.constant ? typemin(Int) : typemax(Int), leaves)
+    return ok, features, values, bounds
+end
+
 function deg2_branch0_eval(
     tree::AbstractExpressionNode{T},
     cX::AbstractMatrix{T},
@@ -793,44 +815,27 @@ function deg2_branch0_eval(
     eval_context::EvalContext{false},
 ) where {T<:Number,F,F2,side}
     index_style = IndexStyle(typeof(cX))
-    branch = side === :left ? get_child(tree, 1) : get_child(tree, 2)
-    leaf1 = side === :left ? get_child(branch, 1) : get_child(tree, 1)
-    leaf2 = side === :left ? get_child(branch, 2) : get_child(branch, 1)
-    leaf3 = side === :left ? get_child(tree, 2) : get_child(branch, 2)
-
-    if eval_context.early_exit isa Val{true} && leaf1.constant && !is_valid(leaf1.val)
-        return ResultOk(get_array(eval_context.buffer, cX, axes(cX, 2)), false)
-    elseif eval_context.early_exit isa Val{true} && leaf2.constant && !is_valid(leaf2.val)
-        return ResultOk(get_array(eval_context.buffer, cX, axes(cX, 2)), false)
-    elseif eval_context.early_exit isa Val{true} && leaf3.constant && !is_valid(leaf3.val)
-        return ResultOk(get_array(eval_context.buffer, cX, axes(cX, 2)), false)
-    end
-
-    constant1 = leaf1.constant
-    constant2 = leaf2.constant
-    constant3 = leaf3.constant
-    feature1 = constant1 ? 1 : leaf1.feature
-    feature2 = constant2 ? 1 : leaf2.feature
-    feature3 = constant3 ? 1 : leaf3.feature
+    ok, features, values, bounds = branch0_leaves(tree, Val(side), eval_context.early_exit)
+    cumulator = get_array(eval_context.buffer, cX, axes(cX, 2))
+    ok || return ResultOk(cumulator, false)
+    feature1, feature2, feature3 = features
+    value1, value2, value3 = values
+    bound1, bound2, bound3 = bounds
     input1_index = first_feature_index(cX, feature1)
     input2_index = first_feature_index(cX, feature2)
     input3_index = first_feature_index(cX, feature3)
     feature_stride = size(cX, 1)
-    value1 = constant1 ? leaf1.val : zero(T)
-    value2 = constant2 ? leaf2.val : zero(T)
-    value3 = constant3 ? leaf3.val : zero(T)
     side_val = Val(side)
     early_exit = eval_context.early_exit
-    cumulator = get_array(eval_context.buffer, cX, axes(cX, 2))
     @inbounds @simd for j in axes(cX, 2)
         x1 = ifelse(
-            constant1, value1, feature_at(cX, input1_index, feature1, j, index_style)
+            j > bound1, value1, feature_at(cX, input1_index, feature1, j, index_style)
         )
         x2 = ifelse(
-            constant2, value2, feature_at(cX, input2_index, feature2, j, index_style)
+            j > bound2, value2, feature_at(cX, input2_index, feature2, j, index_style)
         )
         x3 = ifelse(
-            constant3, value3, feature_at(cX, input3_index, feature3, j, index_style)
+            j > bound3, value3, feature_at(cX, input3_index, feature3, j, index_style)
         )
         cumulator[j] = _fused_binary3(op, branch_op, x1, x2, x3, side_val, early_exit)
         input1_index += feature_stride
