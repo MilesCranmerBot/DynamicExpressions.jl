@@ -191,6 +191,7 @@ function test_functions_on_expressions(::Type{T}, operators) where {T}
     ex = x1 * cos(x2 - T(3.2))
     ex = 2.0 * sin(ex) / 1 + (x1 - 0.5) + (1 - x2)
     ex = copy(ex)
+    ex(rand(T, 2, 10))
     repr(ex)
     string_tree(ex; pretty=true)
     string_tree(Base.inferencebarrier(Expression(Node{T}(; feature=1); operators)))
