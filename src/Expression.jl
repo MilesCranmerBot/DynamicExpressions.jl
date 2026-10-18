@@ -40,6 +40,8 @@ Base.propertynames(x::Metadata) = propertynames(unpack_metadata(x))
 end
 Base.show(io::IO, x::Metadata) = print(io, "Metadata(", unpack_metadata(x), ")")
 @inline _copy(x) = isbits(x) ? x : deepcopy(x)
+# Elements are immutable, so `copy` is already a full copy and avoids `deepcopy`'s overhead.
+@inline _copy(x::AbstractArray{<:Union{Number,String,Symbol}}) = copy(x)
 # Operators stay shared: they can hold closures over user state.
 @inline _copy(x::AbstractOperatorEnum) = x
 @inline _copy(x::NamedTuple) = copy_named_tuple(x)
