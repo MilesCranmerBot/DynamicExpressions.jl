@@ -183,19 +183,20 @@ function precompile_operator_mappings()
 end
 
 """
-Precompile the macros in generated function bodies. A body is lowered whenever it is
-specialized, e.g. for every new operator set, but lowering is not inferred code, so no
-workload caches these macros. The vararg `@nif` and `@ncall` are left out because the
-package image keeps no native code for them.
+Precompile the macros still used in generated function bodies outside evaluation and
+printing, such as the derivative evaluators. A body is lowered whenever it is specialized,
+but lowering is not inferred code, so no workload caches these macros. The vararg `@nif`
+and `@ncall` are left out because the package image keeps no native code for them.
 """
 function precompile_generated_function_macros()
-    (; var"@nexprs", var"@ntuple", lreplace!, LReplace) = Base.Cartesian
-    precompile(var"@nexprs", (LineNumberNode, Module, Int, Expr))
-    precompile(var"@ntuple", (LineNumberNode, Module, Int, Any))
-    precompile(lreplace!, (QuoteNode, LReplace{String}))
-    precompile(
-        EvaluateModule.var"@return_on_nonfinite_array", (LineNumberNode, Module, Any, Any)
-    )
+    C = Base.Cartesian
+    precompile(C.var"@nexprs", (LineNumberNode, Module, Int, Expr))
+    precompile(C.var"@ntuple", (LineNumberNode, Module, Int, Any))
+    # The macros pass quoted names, such as the field in `x_i.y`, through this internal, so
+    # the hint is skipped if a Julia version changes it.
+    if isdefined(C, :lreplace!) && isdefined(C, :LReplace) && C.LReplace isa UnionAll
+        precompile(C.lreplace!, (QuoteNode, C.LReplace{String}))
+    end
     return nothing
 end
 

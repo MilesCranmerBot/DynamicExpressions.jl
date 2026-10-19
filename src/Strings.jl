@@ -1,6 +1,6 @@
 module StringsModule
 
-using ..UtilsModule: deprecate_varmap
+using ..UtilsModule: deprecate_varmap, nif_expr
 using ..OperatorEnumModule: AbstractOperatorEnum
 using ..NodeModule: AbstractExpressionNode, tree_mapreduce, max_degree
 
@@ -42,13 +42,9 @@ end
         key = (Int(degree), Int(branch.op))
         name = get(f.names, key, nothing)
         if name === nothing
-            name = Base.Cartesian.@nif(
-                $D,
-                d -> d == degree,  # COV_EXCL_LINE
-                d -> begin  # COV_EXCL_LINE
-                    dispatch_op_name(Val(d), f.operators, branch.op, f.pretty)
-                end,
-            )::Vector{Char}
+            name = $(nif_expr(D, :degree, d -> :(dispatch_op_name(
+                Val($d), f.operators, branch.op, f.pretty
+            ))))::Vector{Char}
             f.names[key] = name
         end
         return name
