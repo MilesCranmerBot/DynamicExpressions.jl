@@ -182,6 +182,23 @@ function precompile_operator_mappings()
     return nothing
 end
 
+"""
+Precompile the macros in generated function bodies. A body is lowered whenever it is
+specialized, e.g. for every new operator set, but lowering is not inferred code, so no
+workload caches these macros. The vararg `@nif` and `@ncall` are left out because the
+package image keeps no native code for them.
+"""
+function precompile_generated_function_macros()
+    (; var"@nexprs", var"@ntuple", lreplace!, LReplace) = Base.Cartesian
+    precompile(var"@nexprs", (LineNumberNode, Module, Int, Expr))
+    precompile(var"@ntuple", (LineNumberNode, Module, Int, Any))
+    precompile(lreplace!, (QuoteNode, LReplace{String}))
+    precompile(
+        EvaluateModule.var"@return_on_nonfinite_array", (LineNumberNode, Module, Any, Any)
+    )
+    return nothing
+end
+
 function test_functions_on_expressions(::Type{T}, operators) where {T}
     # Users call these from untyped code, so precompile the dynamically dispatched methods
     # rather than versions inlined into this function.
@@ -247,6 +264,7 @@ function do_precompilation(; mode=:precompile)
             test_operator_enum_construction(unary_operators[1], binary_operators[1])
         end
         precompile_operator_mappings()
+        precompile_generated_function_macros()
         operators = OperatorEnum(
             1 => unary_operators[1], 2 => binary_operators[1]; define_helper_functions=false
         )
