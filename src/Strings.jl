@@ -42,9 +42,11 @@ end
         key = (Int(degree), Int(branch.op))
         name = get(f.names, key, nothing)
         if name === nothing
-            name = $(nif_expr(D, :degree, d -> :(dispatch_op_name(
-                Val($d), f.operators, branch.op, f.pretty
-            ))))::Vector{Char}
+            name = $(nif_expr(
+                D,
+                :degree,
+                d -> :(dispatch_op_name(Val($d), f.operators, branch.op, f.pretty)),
+            ))::Vector{Char}
             f.names[key] = name
         end
         return name

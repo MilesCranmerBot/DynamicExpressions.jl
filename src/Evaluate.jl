@@ -423,9 +423,13 @@ end
         $((eval_child_expr(results[i], :(cs[$i])) for i in 1:degree)...)
         op_idx = tree.op
         cumulators = ($((:($result.x) for result in results)...),)
-        $(nif_expr(nops, :op_idx, i -> :(degn_eval(
-            cumulators, get_op(operators, Val($degree), Val($i)), eval_context
-        ))))
+        $(nif_expr(
+            nops,
+            :op_idx,
+            i -> :(degn_eval(
+                cumulators, get_op(operators, Val($degree), Val($i)), eval_context
+            )),
+        ))
     end
 end
 
@@ -439,9 +443,11 @@ end
     return quote
         # If statement over degrees
         degree = tree.degree
-        return $(nif_expr(D, :degree, d -> :(inner_dispatch_degn_eval(
-            tree, cX, Val($d), operators, eval_context
-        ))))
+        return $(nif_expr(
+            D,
+            :degree,
+            d -> :(inner_dispatch_degn_eval(tree, cX, Val($d), operators, eval_context)),
+        ))
     end
 end
 @generated function dispatch_deg2_eval(
@@ -470,44 +476,64 @@ end
         left = get_child(tree, 1)
         right = get_child(tree, 2)
         if fused && left.degree == 0 && right.degree == 0
-            return $(nif_expr(nbin, :op_idx, i -> :(deg2_l0_r0_eval(
-                tree, cX, binops[$i], eval_context
-            ))))
+            return $(nif_expr(
+                nbin, :op_idx, i -> :(deg2_l0_r0_eval(tree, cX, binops[$i], eval_context))
+            ))
         elseif fused && right.degree == 0
             if $supports_branch_fusion &&
                 left.degree == 2 &&
                 get_child(left, 1).degree == 0 &&
                 get_child(left, 2).degree == 0
-                return $(nif_expr(nbin, :op_idx, i -> :(dispatch_deg2_branch0_eval(
-                    tree, cX, binops[$i], left.op, binops, Val(:left), eval_context
-                ))))
+                return $(nif_expr(
+                    nbin,
+                    :op_idx,
+                    i -> :(dispatch_deg2_branch0_eval(
+                        tree, cX, binops[$i], left.op, binops, Val(:left), eval_context
+                    )),
+                ))
             end
             $(eval_child_expr(:result_l, :left))
             # op(x, y), where y is a constant or variable but x is not.
-            return $(nif_expr(nbin, :op_idx, i -> :(deg2_r0_eval(
-                tree, result_l.x, cX, binops[$i], eval_context
-            ))))
+            return $(nif_expr(
+                nbin,
+                :op_idx,
+                i -> :(deg2_r0_eval(tree, result_l.x, cX, binops[$i], eval_context)),
+            ))
         elseif fused && left.degree == 0
             if $supports_branch_fusion &&
                 right.degree == 2 &&
                 get_child(right, 1).degree == 0 &&
                 get_child(right, 2).degree == 0
-                return $(nif_expr(nbin, :op_idx, i -> :(dispatch_deg2_branch0_eval(
-                    tree, cX, binops[$i], right.op, binops, Val(:right), eval_context
-                ))))
+                return $(nif_expr(
+                    nbin,
+                    :op_idx,
+                    i -> :(dispatch_deg2_branch0_eval(
+                        tree,
+                        cX,
+                        binops[$i],
+                        right.op,
+                        binops,
+                        Val(:right),
+                        eval_context,
+                    )),
+                ))
             end
             $(eval_child_expr(:result_r, :right))
             # op(x, y), where x is a constant or variable but y is not.
-            return $(nif_expr(nbin, :op_idx, i -> :(deg2_l0_eval(
-                tree, result_r.x, cX, binops[$i], eval_context
-            ))))
+            return $(nif_expr(
+                nbin,
+                :op_idx,
+                i -> :(deg2_l0_eval(tree, result_r.x, cX, binops[$i], eval_context)),
+            ))
         end
         $(eval_child_expr(:result_l, :left))
         $(eval_child_expr(:result_r, :right))
         # op(x, y), for any x or y
-        return $(nif_expr(nbin, :op_idx, i -> :(deg2_eval(
-            result_l.x, result_r.x, binops[$i], eval_context
-        ))))
+        return $(nif_expr(
+            nbin,
+            :op_idx,
+            i -> :(deg2_eval(result_l.x, result_r.x, binops[$i], eval_context)),
+        ))
     end
 end
 
@@ -521,9 +547,11 @@ end
     eval_context::EvalContext,
 ) where {T,F,side}
     nbin = counttuple(binops)
-    return nif_expr(nbin, :branch_op_idx, i -> :(deg2_branch0_eval(
-        tree, cX, op, binops[$i], side_val, eval_context
-    )))
+    return nif_expr(
+        nbin,
+        :branch_op_idx,
+        i -> :(deg2_branch0_eval(tree, cX, op, binops[$i], side_val, eval_context)),
+    )
 end
 @generated function dispatch_deg1_eval(
     tree::AbstractExpressionNode{T},
@@ -550,20 +578,28 @@ end
             get_child(child, 1).degree == 0 &&
             get_child(child, 2).degree == 0
             # op(op2(x, y)), where x, y, z are constants or variables.
-            return $(nif_expr(nuna, :op_idx, i -> :(dispatch_deg1_l2_ll0_lr0_eval(
-                tree, cX, unaops[$i], child.op, operators.binops, eval_context
-            ))))
+            return $(nif_expr(
+                nuna,
+                :op_idx,
+                i -> :(dispatch_deg1_l2_ll0_lr0_eval(
+                    tree, cX, unaops[$i], child.op, operators.binops, eval_context
+                )),
+            ))
         elseif fused && child.degree == 1 && get_child(child, 1).degree == 0
             # op(op2(x)), where x is a constant or variable.
-            return $(nif_expr(nuna, :op_idx, i -> :(dispatch_deg1_l1_ll0_eval(
-                tree, cX, unaops[$i], child.op, unaops, eval_context
-            ))))
+            return $(nif_expr(
+                nuna,
+                :op_idx,
+                i -> :(dispatch_deg1_l1_ll0_eval(
+                    tree, cX, unaops[$i], child.op, unaops, eval_context
+                )),
+            ))
         end
         # op(x), for any x.
         $(eval_child_expr(:result, :child))
-        return $(nif_expr(nuna, :op_idx, i -> :(deg1_eval(
-            result.x, unaops[$i], eval_context
-        ))))
+        return $(nif_expr(
+            nuna, :op_idx, i -> :(deg1_eval(result.x, unaops[$i], eval_context))
+        ))
     end
 end
 @generated function dispatch_deg1_l2_ll0_lr0_eval(
@@ -577,9 +613,11 @@ end
     nbin = counttuple(binops)
     # (Note this is only called from dispatch_deg1_eval, which has already
     # checked for long compilation times, so we don't need to check here)
-    return nif_expr(nbin, :l_op_idx, j -> :(deg1_l2_ll0_lr0_eval(
-        tree, cX, op, binops[$j], eval_context
-    )))
+    return nif_expr(
+        nbin,
+        :l_op_idx,
+        j -> :(deg1_l2_ll0_lr0_eval(tree, cX, op, binops[$j], eval_context)),
+    )
 end
 @generated function dispatch_deg1_l1_ll0_eval(
     tree::AbstractExpressionNode{T},
@@ -590,9 +628,9 @@ end
     eval_context::EvalContext,
 )::ResultOk where {T,F}
     nuna = counttuple(unaops)
-    return nif_expr(nuna, :l_op_idx, j -> :(deg1_l1_ll0_eval(
-        tree, cX, op, unaops[$j], eval_context
-    )))
+    return nif_expr(
+        nuna, :l_op_idx, j -> :(deg1_l1_ll0_eval(tree, cX, op, unaops[$j], eval_context))
+    )
 end
 
 function deg1_l2_ll0_lr0_eval(
@@ -917,9 +955,9 @@ over an entire array when the values are all the same.
     quote
         deg = tree.degree
         deg == 0 && return deg0_eval_constant(tree)
-        $(nif_expr(D, :deg, i -> :(inner_dispatch_degn_eval_constant(
-            tree, Val($i), operators
-        ))))
+        $(nif_expr(
+            D, :deg, i -> :(inner_dispatch_degn_eval_constant(tree, Val($i), operators))
+        ))
     end
 end
 
@@ -931,10 +969,17 @@ end
     input_names = [Symbol(:input_, i) for i in 1:degree]
     get_inputs = quote
         cs = get_children(tree, Val($degree))
-        $((:($(input_names[i]) = let result = dispatch_constant_tree(cs[$i], operators)
-            !result.ok && return result
-            result.x
-        end) for i in 1:degree)...)
+        $(
+            (
+                :(
+                    $(input_names[i]) =
+                        let result = dispatch_constant_tree(cs[$i], operators)
+                            !result.ok && return result
+                            result.x
+                        end
+                ) for i in 1:degree
+            )...
+        )
         inputs = ($(input_names...),)
     end
     if nops > OPERATOR_LIMIT_BEFORE_SLOWDOWN
@@ -947,9 +992,15 @@ end
         return quote
             $get_inputs
             op_idx = tree.op
-            $(nif_expr(nops, :op_idx, i -> :(degn_eval_constant(
-                inputs, get_op(operators, Val($degree), Val($i))
-            )::ResultOk{T})))
+            $(nif_expr(
+                nops,
+                :op_idx,
+                i -> :(
+                    degn_eval_constant(
+                        inputs, get_op(operators, Val($degree), Val($i))
+                    )::ResultOk{T}
+                ),
+            ))
         end
     end
 end
