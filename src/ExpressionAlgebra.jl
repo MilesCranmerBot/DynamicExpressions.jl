@@ -99,7 +99,7 @@ allow_chaining(::typeof(*)) = true
             break
         end
     end
-    example_expr = args[idx::Int]
+    example_expr = args[idx::Int]::AbstractExpression
     E = typeof(example_expr)
     for arg in args
         @assert !(arg isa AbstractExpression) || typeof(arg) === E
