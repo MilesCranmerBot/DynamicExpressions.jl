@@ -41,12 +41,13 @@ end
     end
 end
 
-const OP_NAME_CACHE = (; x=IdDict{Any,String}(), lock=Threads.SpinLock())
+const OP_NAME_CACHE = (; x=Dict{UInt64,String}(), lock=Threads.SpinLock())
 
 function get_op_name(op::F) where {F}
-    # Only singleton callables have a fixed name, and caching them keeps nothing alive.
-    Base.issingletontype(F) &&
-        return @lock OP_NAME_CACHE.lock get!(() -> _get_op_name(op), OP_NAME_CACHE.x, op)
+    # Only singleton callables have a fixed name.
+    Base.issingletontype(F) && return @lock OP_NAME_CACHE.lock get!(
+        () -> _get_op_name(op), OP_NAME_CACHE.x, objectid(op)
+    )
     return _get_op_name(op)
 end
 function _get_op_name(op)
