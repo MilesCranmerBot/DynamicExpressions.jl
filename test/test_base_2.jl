@@ -165,3 +165,14 @@ end
     @test !(b == a)
     @test a == copy_node(a)
 end
+
+@testitem "Constructor degree inference" begin
+    for D in (1, 3), N in (Node, GraphNode)
+        x = N{Float64,D}(; feature=1)
+        for cs in ((x,), ntuple(_ -> x, D), [x])
+            n = N(; op=1, children=cs)
+            @test typeof(n) === typeof(x)
+            @test get_children(n, length(cs)) == Tuple(cs)
+        end
+    end
+end
