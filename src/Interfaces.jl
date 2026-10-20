@@ -284,7 +284,14 @@ end
 function _check_tree_mapreduce(tree::AbstractExpressionNode)
     return tree_mapreduce(_ -> 1, +, tree, Int64) ==
            tree_mapreduce(_ -> 1, _ -> 1, +, tree, Int64) ==
-           count_nodes(tree)
+           count_nodes(tree; break_sharing=Val(true))
+end
+function _check_iterate(tree::AbstractExpressionNode)
+    nodes = collect(tree)
+    iterated = [n for n in tree]
+    mapped = map(identity, tree)
+    return length(iterated) == length(mapped) == length(nodes) &&
+           all(i -> iterated[i] === nodes[i] === mapped[i], eachindex(nodes))
 end
 
 ## optional
@@ -323,9 +330,7 @@ end
 function _check_branch_copy_into!(tree::AbstractExpressionNode{T}) where {T}
     tree.degree == 0 && return true
     new_branch = constructorof(typeof(tree))(; val=zero(T))
-    ret = branch_copy_into!(
-        new_branch, tree, map(copy, get_children(tree, Val(tree.degree)))...
-    )
+    ret = branch_copy_into!(new_branch, tree, get_children(tree, Val(tree.degree))...)
     return new_branch == tree && ret === new_branch
 end
 function _check_branch_convert(tree::AbstractExpressionNode)
@@ -390,7 +395,8 @@ ni_components = (
         default_allocator = "gets the default allocator for the node type" => _check_default_allocator,
         set_node! = "sets the node's value" => _check_set_node!,
         count_nodes = "counts the number of nodes in the tree" => _check_count_nodes,
-        tree_mapreduce = "applies a function across the tree" => _check_tree_mapreduce
+        tree_mapreduce = "applies a function across the tree" => _check_tree_mapreduce,
+        iterate = "iterating, `collect`, and `map` visit the same nodes in the same order" => _check_iterate
     ),
     optional = (
         copy_into! = "copies a node into a preallocated container" => _check_copy_into!,
