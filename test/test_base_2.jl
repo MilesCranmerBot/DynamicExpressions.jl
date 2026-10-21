@@ -166,6 +166,12 @@ end
     @test a == copy_node(a)
 end
 
+@testitem "Equality across maximum degrees" begin
+    @test Node{Float64,1}(; feature=1) == Node{Float64,2}(; feature=1)
+    @test GraphNode{Float64,1}(; feature=1) == GraphNode{Float64,2}(; feature=1)
+    @test Node{Float64,1}(; feature=1) != Node{Float64,2}(; feature=2)
+end
+
 @testitem "Constructor degree inference" begin
     for D in (1, 3), N in (Node, GraphNode)
         x = N{Float64,D}(; feature=1)

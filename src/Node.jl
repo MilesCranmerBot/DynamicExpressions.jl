@@ -468,14 +468,18 @@ function (::Type{N})(
     return N(; feature=i)
 end
 
-function Base.promote_rule(::Type{Node{T1,D}}, ::Type{Node{T2,D}}) where {T1,T2,D}
-    return Node{promote_type(T1, T2),D}
+function Base.promote_rule(::Type{Node{T1,D1}}, ::Type{Node{T2,D2}}) where {T1,T2,D1,D2}
+    return Node{promote_type(T1, T2),max(D1, D2)}
 end
-function Base.promote_rule(::Type{GraphNode{T1,D}}, ::Type{Node{T2,D}}) where {T1,T2,D}
-    return GraphNode{promote_type(T1, T2),D}
+function Base.promote_rule(
+    ::Type{GraphNode{T1,D1}}, ::Type{Node{T2,D2}}
+) where {T1,T2,D1,D2}
+    return GraphNode{promote_type(T1, T2),max(D1, D2)}
 end
-function Base.promote_rule(::Type{GraphNode{T1,D}}, ::Type{GraphNode{T2,D}}) where {T1,T2,D}
-    return GraphNode{promote_type(T1, T2),D}
+function Base.promote_rule(
+    ::Type{GraphNode{T1,D1}}, ::Type{GraphNode{T2,D2}}
+) where {T1,T2,D1,D2}
+    return GraphNode{promote_type(T1, T2),max(D1, D2)}
 end
 
 """
