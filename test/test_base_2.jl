@@ -140,6 +140,13 @@ end
     @test_throws ArgumentError Node{Float64}(; op=1, r=x, children=(x,))
 end
 
+@testitem "set_children! rejects excess children" begin
+    x = Node{Float64}(; feature=1)
+    @test_throws ArgumentError set_children!(x, (x, x, x))
+    @test_throws ArgumentError set_children!(x, [x, x, x])
+    @test x.degree == 0
+end
+
 @testitem "Graph conversion removes sharing" begin
     x = GraphNode{Float64}(; feature=1)
     shared = GraphNode{Float64}(; op=1, children=(x, x))
