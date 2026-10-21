@@ -282,9 +282,10 @@ function _check_count_nodes(tree::AbstractExpressionNode)
     return count_nodes(tree) isa Int64
 end
 function _check_tree_mapreduce(tree::AbstractExpressionNode)
-    return tree_mapreduce(_ -> 1, +, tree, Int64) ==
-           tree_mapreduce(_ -> 1, _ -> 1, +, tree, Int64) ==
-           count_nodes(tree; break_sharing=Val(true))
+    f_on_shared = (c, is_shared) -> is_shared ? 0 : c
+    return tree_mapreduce(_ -> 1, +, tree, Int64; f_on_shared) ==
+           tree_mapreduce(_ -> 1, _ -> 1, +, tree, Int64; f_on_shared) ==
+           count_nodes(tree)
 end
 function _check_iterate(tree::AbstractExpressionNode)
     nodes = collect(tree)
