@@ -23,6 +23,10 @@ if PACKAGE_VERSION < v"0.18.6"
         set_constants! as set_scalar_constants!
 end
 
+if !@isdefined(combine_operators!)
+    @eval const combine_operators! = combine_operators
+end
+
 include("../test/tree_gen_utils.jl")
 
 const SUITE = BenchmarkGroup()
@@ -131,7 +135,7 @@ function benchmark_utilities()
         :copy,
         :convert,
         :simplify_tree,
-        :combine_operators,
+        :combine_operators!,
         :count_nodes,
         :count_depth,
         :count_constant_nodes,
@@ -185,7 +189,7 @@ function benchmark_utilities()
                         tree;
                         preserve_sharing=(k == :preserve_sharing),
                     )
-                elseif func_k in (:simplify_tree, :combine_operators, :string_tree)
+                elseif func_k in (:simplify_tree, :combine_operators!, :string_tree)
                     g = getfield(@__MODULE__, func_k)
                     tree -> f_tree_op(g, tree, operators)
                 else

@@ -107,9 +107,19 @@ end
         operators = OperatorEnum(; binary_operators=[+, -]),
         variable_names = [:x],
     )
-    out = combine_operators(ex)
+    out = combine_operators!(ex)
     @test typeof(out) === typeof(ex)
     @test string_tree(out) == "x + 5.0"
+end
+
+@testitem "Deprecated combine_operators" begin
+    using DynamicExpressions
+
+    operators = OperatorEnum(; binary_operators=[+, -])
+    ex = @parse_expression((2.0 + x) + 3.0, operators = operators, variable_names = [:x])
+    expected = get_tree(combine_operators!(copy(ex)))
+    @test get_tree(@test_deprecated(combine_operators(copy(ex)))) == expected
+    @test @test_deprecated(combine_operators(get_tree(copy(ex)), operators)) == expected
 end
 
 @testitem "Nested repeat operators in Expression parsing" begin
@@ -385,7 +395,7 @@ end
     complex_expr = parse_expression(
         :((2.0 + x) + 3.0); operators=operators, variable_names=["x"]
     )
-    simplified_expr = combine_operators(copy(complex_expr))
+    simplified_expr = combine_operators!(copy(complex_expr))
     println("Original: ", complex_expr)
     println("Simplified: ", simplified_expr)
 
