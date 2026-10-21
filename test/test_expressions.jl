@@ -485,6 +485,31 @@ end
     @test get_metadata(ex).variable_names == ["x"]
 end
 
+@testitem "Expression copy shares only immutable metadata elements" begin
+    using DynamicExpressions
+    using DynamicExpressions: get_metadata
+    using DynamicExpressions.ExpressionModule: _is_static
+
+    mutable struct Counter
+        n::Int
+    end
+    operators = OperatorEnum(2 => (+,))
+    ex = Expression(
+        Node{Float64}(; feature=1);
+        operators,
+        bigs=[big"1.5"],
+        counters=[Counter(1)],
+        names=["x"],
+        tags=[:a],
+    )
+    original, copied = get_metadata(ex), get_metadata(copy(ex))
+    @test copied.bigs[1] !== original.bigs[1]
+    @test copied.counters[1] !== original.counters[1]
+    @test copied.names !== original.names && copied.tags !== original.tags
+    @test _is_static(String) && _is_static(Symbol)
+    @test !_is_static(BigFloat) && !_is_static(Counter)
+end
+
 @testitem "New binary operators" begin
     using DynamicExpressions
 

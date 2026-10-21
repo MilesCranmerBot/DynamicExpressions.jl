@@ -39,8 +39,33 @@ Base.propertynames(x::Metadata) = propertynames(unpack_metadata(x))
     return getproperty(unpack_metadata(x), f)
 end
 Base.show(io::IO, x::Metadata) = print(io, "Metadata(", unpack_metadata(x), ")")
-@inline _copy(x) = isbits(x) ? x : deepcopy(x)
-@inline _copy(x::AbstractArray) = isbitstype(eltype(x)) ? copy(x) : deepcopy(x)
+# Whether values of a type are immutable all the way down, so copying can share them.
+# Taken from BorrowChecker.jl's `is_static`.
+@inline function _is_static(::Type{T})::Bool where {T}
+    if isbitstype(T)
+        return true
+    elseif T isa UnionAll || T === Union{}
+        return false
+    elseif isstructtype(T) && ismutabletype(T)
+        return false
+    elseif T isa Union
+        return _is_static(T.a) && _is_static(T.b)
+    elseif !(T isa DataType)
+        return false
+    elseif Base.datatype_fieldcount(T) === nothing
+        return false
+    else
+        return all(_is_static, fieldtypes(T))
+    end
+end
+_is_static(::Type{<:Type}) = true
+_is_static(::Type{Symbol}) = true
+_is_static(::Type{String}) = true
+_is_static(::Type{Module}) = true
+_is_static(::T) where {T} = _is_static(T)
+
+@inline _copy(x) = _is_static(x) ? x : deepcopy(x)
+@inline _copy(x::AbstractArray) = _is_static(eltype(x)) ? copy(x) : deepcopy(x)
 # Operators stay shared: they can hold closures over user state.
 @inline _copy(x::AbstractOperatorEnum) = x
 @inline _copy(x::NamedTuple) = copy_named_tuple(x)
