@@ -44,29 +44,24 @@ end
 const OP_NAME_CACHE = (; x=Dict{UInt64,String}(), lock=Threads.SpinLock())
 
 function get_op_name(op::F) where {F}
-    h = hash(op)
-    lock(OP_NAME_CACHE.lock)
-    try
-        cache = OP_NAME_CACHE.x
-        if haskey(cache, h)
-            return cache[h]
-        end
-        op_s = if op isa Broadcast.BroadcastFunction
-            base_op_s = string(op.f)
-            if length(base_op_s) == 1 && first(base_op_s) in ('+', '-', '*', '/', '^')
-                # Like `.+`
-                string('.', base_op_s)
-            else
-                # Like `cos.`
-                string(base_op_s, '.')
-            end
+    # Only singleton callables have a fixed name.
+    Base.issingletontype(F) && return @lock OP_NAME_CACHE.lock get!(
+        () -> _get_op_name(op), OP_NAME_CACHE.x, objectid(op)
+    )
+    return _get_op_name(op)
+end
+function _get_op_name(op)
+    if op isa Broadcast.BroadcastFunction
+        base_op_s = string(op.f)
+        if length(base_op_s) == 1 && first(base_op_s) in ('+', '-', '*', '/', '^')
+            # Like `.+`
+            return string('.', base_op_s)
         else
-            string(op)
+            # Like `cos.`
+            return string(base_op_s, '.')
         end
-        cache[h] = op_s
-        return op_s
-    finally
-        unlock(OP_NAME_CACHE.lock)
+    else
+        return string(op)
     end
 end
 function get_pretty_op_name(op::F) where {F}
