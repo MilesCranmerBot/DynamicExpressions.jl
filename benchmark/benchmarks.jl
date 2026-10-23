@@ -1,7 +1,7 @@
 using DynamicExpressions, BenchmarkTools, Random
 
 # Trigger extensions:
-using LoopVectorization, Bumper, StrideArrays, Zygote
+using LoopVectorization, StrideArrays, Zygote
 
 if PACKAGE_VERSION < v"0.14.0"
     @eval using DynamicExpressions: Node as GraphNode
@@ -21,6 +21,10 @@ if PACKAGE_VERSION < v"0.18.6"
         count_constants as count_constant_nodes,
         get_constants as get_scalar_constants,
         set_constants! as set_scalar_constants!
+end
+
+if !@isdefined(combine_operators!)
+    @eval const combine_operators! = combine_operators
 end
 
 include("../test/tree_gen_utils.jl")
@@ -43,35 +47,15 @@ function benchmark_evaluation()
         n = 1_000
 
         #! format: off
-        for turbo in (false, true), bumper in (false, true)
+        for turbo in (false, true)
 
-            (turbo || bumper) && !(T in (Float32, Float64)) && continue
-            if bumper
-                try
-                    eval_tree_array(Node{T}(val=1.0), ones(T, 5, n), operators; turbo, bumper)
-                catch e
-                    isa(e, MethodError) || rethrow(e)
-                    @warn "Skipping bumper tests"
-                    continue  # Assume its not available
-                end
-            end
-
-            extra_key = if turbo && bumper
-                "_turbo_bumper"
-            elseif turbo
-                "_turbo"
-            elseif bumper
-                "_bumper"
-            else
-                ""
-            end
-            extra_kws = bumper ? (; bumper=Val(true)) : ()
+            turbo && !(T in (Float32, Float64)) && continue
+            extra_key = turbo ? "_turbo" : ""
             eval_tree_array(
                 gen_random_tree_fixed_size(20, operators, 5, T),
                 randn(MersenneTwister(0), T, 5, n),
                 operators;
-                turbo,
-                extra_kws...
+                turbo
             )
             suite[T]["evaluation$(extra_key)"] = @benchmarkable(
                 [eval_tree_array(tree, X, $operators; kws...) for tree in trees],
@@ -81,15 +65,15 @@ function benchmark_evaluation()
                     ntrees=100;
                     kws=$(
                         if @isdefined(EvalContext)
-                            (; eval_options=EvalContext(; turbo=turbo, extra_kws...))
+                            (; eval_options=EvalContext(; turbo=turbo))
                         else
-                            (; turbo, extra_kws...)
+                            (; turbo)
                         end
                     );
                     trees=[gen_random_tree_fixed_size(treesize, $operators, 5, $T) for _ in 1:ntrees]
                 )
             )
-            if T <: Real && !bumper
+            if T <: Real
                 eval_grad_tree_array(
                     gen_random_tree_fixed_size(20, operators, 5, T),
                     randn(MersenneTwister(0), T, 5, n),
@@ -151,7 +135,7 @@ function benchmark_utilities()
         :copy,
         :convert,
         :simplify_tree,
-        :combine_operators,
+        :combine_operators!,
         :count_nodes,
         :count_depth,
         :count_constant_nodes,
@@ -205,7 +189,7 @@ function benchmark_utilities()
                         tree;
                         preserve_sharing=(k == :preserve_sharing),
                     )
-                elseif func_k in (:simplify_tree, :combine_operators, :string_tree)
+                elseif func_k in (:simplify_tree, :combine_operators!, :string_tree)
                     g = getfield(@__MODULE__, func_k)
                     tree -> f_tree_op(g, tree, operators)
                 else

@@ -67,9 +67,9 @@ function test_all_combinations(; binary_operators, unary_operators, turbo, types
         end
 
         # Both operators
-        for i in eachindex(binary_operators),
-            j1 in eachindex(unary_operators),
-            j2 in eachindex(unary_operators),
+        for i in eachindex(binops),
+            j1 in eachindex(unaops),
+            j2 in eachindex(unaops),
             l in (x, c),
             r in (x, c)
 
@@ -135,7 +135,7 @@ function test_functions_on_trees(::Type{T}, operators) where {T}
     has_operators(tree)
     has_constants(tree)
     set_scalar_constants!(tree, get_scalar_constants(tree)...)
-    combine_operators(tree, operators)
+    combine_operators!(tree, operators)
     simplify_tree!(tree, operators)
     return nothing
 end
@@ -150,7 +150,7 @@ macro maybe_setup_workload(mode, ex)
         elseif $(esc(mode)) == :precompile
             $(esc(precompile_ex))
         else
-            error("Invalid value for mode: " * show($(esc(mode))))
+            error("Invalid value for mode: " * repr($(esc(mode))))
         end
     end
 end
@@ -165,7 +165,7 @@ macro maybe_compile_workload(mode, ex)
         elseif $(esc(mode)) == :precompile
             $(esc(precompile_ex))
         else
-            error("Invalid value for mode: " * show($(esc(mode))))
+            error("Invalid value for mode: " * repr($(esc(mode))))
         end
     end
 end

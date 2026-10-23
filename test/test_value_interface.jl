@@ -40,3 +40,36 @@ end
     @test DynamicExpressions.ValueInterfaceModule._check_unpack_scalar_constants("hello") ==
         false
 end
+
+@testitem "Zero-scalar constants round-trip" begin
+    struct EmptyScalarValue end
+    const VI = DynamicExpressions.ValueInterfaceModule
+    VI.get_number_type(::Type{EmptyScalarValue}) = Float64
+    VI.count_scalar_constants(::EmptyScalarValue) = 0
+    VI.pack_scalar_constants!(out::AbstractVector{<:Number}, i::Int64, ::EmptyScalarValue) =
+        i
+    function VI.unpack_scalar_constants(
+        out::AbstractVector{<:Number}, i::Int64, x::EmptyScalarValue
+    )
+        return (i, x)
+    end
+
+    tree = Node{EmptyScalarValue}(; val=EmptyScalarValue())
+    values, refs = get_scalar_constants(tree)
+    @test isempty(values)
+    @test length(refs) == 1
+    @test set_scalar_constants!(tree, values, refs) === tree
+    @test isempty(first(get_scalar_constants(tree)))
+end
+
+@testitem "Array validity is elementwise" begin
+    VI = DynamicExpressions.ValueInterfaceModule
+    for T in (Float16, Float32, Float64, ComplexF64)
+        large = T <: Complex ? T(floatmax(Float64)) : floatmax(T)
+        @test VI.is_valid_array([large, large])
+        @test VI.is_valid_array(T[])
+        for bad in (Inf, -Inf, NaN)
+            @test !VI.is_valid_array(T[1, bad])
+        end
+    end
+end

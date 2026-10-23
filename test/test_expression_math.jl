@@ -212,3 +212,24 @@ end
     @test res1 == [3]             # (2 × 1) → 1-element vector
     @test res2 == [4, 6]          # (2 × 2) → 2-element vector, Int→Float64 promotion
 end
+
+@testitem "Missing operator degree diagnostic" begin
+    using DynamicExpressions.ExpressionAlgebraModule: MissingOperatorError
+    x = Expression(Node{Float64}(; feature=1); operators=OperatorEnum(2 => (+, *)))
+    @test_throws MissingOperatorError clamp(x, 0.0, 1.0)
+end
+
+@testitem "Scalar-prefix operator chaining" begin
+    using DynamicExpressions.NodeModule: Node
+    using DynamicExpressions.ExpressionModule: Expression
+    using DynamicExpressions.OperatorEnumModule: OperatorEnum
+
+    operators = OperatorEnum(2 => (+, *))
+    x = Expression(Node{Float64}(; feature=1); operators)
+    for op in (+, *)
+        for args in ((1.0, 2.0, x), (1.0, x, 2.0), (x, 1.0, 2.0))
+            result = op(args...)
+            @test result(reshape([3.0], 1, 1)) == [6.0]
+        end
+    end
+end

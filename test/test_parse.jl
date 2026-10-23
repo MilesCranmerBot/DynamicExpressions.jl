@@ -642,3 +642,90 @@ end
         "NOPE * x1"; operators, variable_names=["x1"], node_type=Node{Float64}
     )
 end
+
+@testitem "Printing round-trips powers with signed bases" begin
+    using DynamicExpressions
+    using Test
+
+    operators = OperatorEnum(1 => (-,), 2 => (^, *); define_helper_functions=false)
+    variable_names = ["x1"]
+    x1 = Node{Float64}(; feature=1)
+    c(v) = Node{Float64}(; val=v)
+    neg(a) = Node(; op=1, children=(a,))
+    pow(a, b) = Node(; op=1, children=(a, b))
+    mul(a, b) = Node(; op=2, children=(a, b))
+
+    X = [3.0;;]
+    for (tree, expected_string, expected_value) in (
+        (pow(c(-2.0), x1), "(-2.0) ^ x1", -8.0),
+        (pow(neg(x1), c(2.0)), "(-(x1)) ^ 2.0", 9.0),
+        (neg(pow(x1, c(2.0))), "-(x1 ^ 2.0)", -9.0),
+        (pow(x1, c(-2.0)), "x1 ^ -2.0", 1 / 9),
+        (mul(c(-2.0), x1), "-2.0 * x1", -6.0),
+    )
+        s = string_tree(tree, operators; variable_names)
+        @test s == expected_string
+        @test only(tree(X, operators)) ≈ expected_value
+        parsed = parse_expression(s; operators, variable_names, node_type=Node{Float64})
+        @test parsed.tree == tree
+        @test only(parsed(X)) ≈ expected_value
+    end
+
+    broadcast_operators = OperatorEnum(
+        2 => (Base.BroadcastFunction(^),); define_helper_functions=false
+    )
+    @test string_tree(pow(c(-2.0), x1), broadcast_operators; variable_names) ==
+        "(-2.0) .^ x1"
+end
+
+@testitem "StringsParse interpolated nodes honor node_type" begin
+    using DynamicExpressions
+    using Test
+    operators = OperatorEnum(2 => (+,); define_helper_functions=false)
+    tree = Node{Float64}(; op=1, children=(Node{Float64}(; feature=1), Node(; val=2.0)))
+    for node_type in (GraphNode, GraphNode{Float32}, Node{Float32})
+        parsed = parse_expression(tree; operators, variable_names=["x1"], node_type)
+        @test parsed.tree isa node_type
+        @test all(n -> n isa node_type, parsed.tree)
+        @test parsed.tree == convert(node_type, tree)
+    end
+    @test parse_expression(tree; operators, node_type=Node{Float64}).tree === tree
+    parsed = @parse_expression(
+        $tree + x1,
+        operators = operators,
+        variable_names = ["x1"],
+        node_type = GraphNode{Float64}
+    )
+    @test parsed.tree isa GraphNode{Float64}
+    @test all(n -> n isa GraphNode{Float64}, parsed.tree)
+end
+
+@testitem "StringsParse nonfinite constants round-trip" begin
+    using DynamicExpressions
+    using Test
+    operators = OperatorEnum(; define_helper_functions=false)
+    for value in (NaN, Inf, -Inf, NaN32, Inf32, -Inf32)
+        parsed = parse_expression(string_tree(Node(; val=value), operators); operators)
+        @test parsed.tree.degree == 0
+        @test parsed.tree.constant
+        @test isequal(parsed.tree.val, value)
+    end
+end
+
+@testitem "StringsParse callable names survive hash collisions" begin
+    using DynamicExpressions
+    using Test
+    struct SameHashOperator <: Function
+        label::String
+    end
+    (op::SameHashOperator)(x) = x
+    Base.hash(::SameHashOperator, h::UInt) = zero(UInt)
+    Base.show(io::IO, op::SameHashOperator) = print(io, op.label)
+    tree = Node(; op=1, children=(Node(; feature=1),))
+    for label in ("f", "g", "f")
+        operators = OperatorEnum(
+            1 => (SameHashOperator(label),); define_helper_functions=false
+        )
+        @test string_tree(tree, operators) == label * "(x1)"
+    end
+end

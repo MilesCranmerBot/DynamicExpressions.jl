@@ -79,16 +79,6 @@ end
 
 testitem_suffixes = String[]
 
-if "main" in test_names
-    push!(testitem_suffixes, joinpath("test", "test_distributed_serialization.jl"))
-    push!(testitem_suffixes, joinpath("test", "unittest.jl"))
-    push!(testitem_suffixes, joinpath("test", "test_parse.jl"))
-    push!(testitem_suffixes, joinpath("test", "test_evaluation.jl"))
-    push!(testitem_suffixes, joinpath("test", "test_invalid_values.jl"))
-    push!(testitem_suffixes, joinpath("test", "test_buffered_evaluation.jl"))
-    push!(testitem_suffixes, joinpath("test", "test_unary_feature_cache.jl"))
-    push!(testitem_suffixes, joinpath("test", "test_optim.jl"))
-end
 if "distributed" in test_names
     push!(testitem_suffixes, joinpath("test", "test_distributed_serialization.jl"))
 end
@@ -99,7 +89,9 @@ if "narity" in test_names
     push!(testitem_suffixes, joinpath("test", "test_n_arity_nodes.jl"))
 end
 
-if !isempty(testitem_suffixes)
+if "main" in test_names || !isempty(testitem_suffixes)
     @run_package_tests filter =
-        ti -> any(suf -> endswith(ti.filename, suf), testitem_suffixes)
+        ti ->
+            ("main" in test_names && dirname(ti.filename) == @__DIR__) ||
+                any(suf -> endswith(ti.filename, suf), testitem_suffixes)
 end

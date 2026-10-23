@@ -36,6 +36,7 @@ import .ValueInterfaceModule:
     get_number_type,
     pack_scalar_constants!,
     unpack_scalar_constants,
+    copy_value,
     ValueInterface
 @reexport import .NodeModule:
     AbstractNode,
@@ -85,7 +86,7 @@ import .StringsModule: get_op_name, get_pretty_op_name
 import .EvaluateModule: ArrayBuffer, ResultOk
 @reexport import .EvaluateDerivativeModule: eval_diff_tree_array, eval_grad_tree_array
 @reexport import .ChainRulesModule: NodeTangent, extract_gradient
-@reexport import .SimplifyModule: combine_operators, simplify_tree!
+@reexport import .SimplifyModule: combine_operators, combine_operators!, simplify_tree!
 @reexport import .EvaluationHelpersModule
 @reexport import .ExtensionInterfaceModule: node_to_symbolic, symbolic_to_node
 @reexport import .RandomModule: NodeSampler

@@ -120,6 +120,8 @@ end
 
 Set the constants in a tree, in depth-first order. The function
 `get_scalar_constants` gets them in the same order.
+`constants` must not share memory with the expression's own parameters
+(e.g., a view of them).
 """
 function set_scalar_constants!(tree::AbstractExpressionNode{T}, constants, refs) where {T}
     if T <: Number
@@ -129,7 +131,7 @@ function set_scalar_constants!(tree::AbstractExpressionNode{T}, constants, refs)
     else
         nums_i = 1
         refs_i = 1
-        while nums_i <= length(constants) && refs_i <= length(refs)
+        while refs_i <= length(refs)
             ix, v = unpack_scalar_constants(constants, nums_i, refs[refs_i][].val::T)
             refs[refs_i][].val = v
             nums_i = ix

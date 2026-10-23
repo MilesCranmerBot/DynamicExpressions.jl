@@ -15,7 +15,11 @@ invalid_value(::Type{T}) where {T<:AbstractFloat} = T(NaN)
 invalid_value(::Type{Complex{T}}) where {T<:AbstractFloat} = Complex{T}(T(NaN), zero(T))
 
 is_valid_array(x::AbstractArray{T}) where {T} = all(is_valid, x)
-is_valid_array(x::AbstractArray{T}) where {T<:Number} = is_valid(sum(x))
+function is_valid_array(
+    x::AbstractArray{T}
+) where {T<:Union{AbstractFloat,Complex{<:AbstractFloat}}}
+    return is_valid(sum(x)) || all(is_valid, x)
+end
 
 get_number_type(t::Type) = error("Base number type of type $(t) is not defined")
 get_number_type(::Type{T}) where {T<:Number} = T  # COV_EXCL_LINE
@@ -68,6 +72,14 @@ Count how many scalar constants `value` has, for use in `pack_scalar_constants!`
 Note that this will return 1 for scalars.
 """
 @inline count_scalar_constants(::T) where {T<:Number} = 1  # COV_EXCL_LINE
+
+"""
+    copy_value(value)
+
+Copy `value` so that the copy shares no mutable state with it.
+Used when copying constant nodes. Defaults to `deepcopy` for non-isbits types.
+"""
+@inline copy_value(x::T) where {T} = isbitstype(T) ? x : deepcopy(x)
 
 ################################################################################
 # Interface.jl integration #####################################################
@@ -139,6 +151,9 @@ function _check_count_scalar_constants(x)
     return count_scalar_constants(x) isa Int &&
            (!(x isa Number) || count_scalar_constants(x) == 1)
 end
+function _check_copy_value(x)
+    return copy_value(x) isa typeof(x)
+end
 
 #! format: off
 vi_components = (
@@ -149,6 +164,7 @@ vi_components = (
         pack_scalar_constants! = "packs scalar constants into an array" => _check_pack_scalar_constants!,
         unpack_scalar_constants = "unpacks scalar constants from an array" => _check_unpack_scalar_constants,
         count_scalar_constants = "counts how many scalar constants the value has" => _check_count_scalar_constants,
+        copy_value = "copies the value without sharing mutable state" => _check_copy_value,
     ),
     optional = (
         invalid_value = "constructs an invalid value of the same type" => _check_invalid_value,

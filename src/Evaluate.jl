@@ -8,7 +8,7 @@ import ..StringsModule: string_tree
 import ..OperatorEnumModule: AbstractOperatorEnum, OperatorEnum, GenericOperatorEnum
 import ..UtilsModule: fill_similar, counttuple, ResultOk
 import ..NodeUtilsModule: is_constant
-import ..ExtensionInterfaceModule: bumper_eval_tree_array, _is_loopvectorization_loaded
+import ..ExtensionInterfaceModule: _is_loopvectorization_loaded
 import ..ValueInterfaceModule: is_valid, is_valid_array
 
 const OPERATOR_LIMIT_BEFORE_SLOWDOWN = 15
@@ -73,7 +73,7 @@ end
 
 function get_array(buffer::ArrayBuffer{<:AbstractMatrix}, template::AbstractArray, axes...)
     i = next_index!(buffer)
-    out = @view(buffer.array[i, :])
+    out = @view(buffer.array[i, axes...])
     return out
 end
 
@@ -90,39 +90,24 @@ end
 function get_filled_array(::Nothing, value, template::AbstractArray, axes...)
     return fill_similar(value, template, axes...)
 end
-function get_filled_array(
-    buffer::ArrayBuffer{<:AbstractMatrix}, value, template::AbstractArray, axes...
-)
-    i = next_index!(buffer)
-    @inbounds buffer.array[i, :] .= value
-    return @view(buffer.array[i, :])
-end
-function get_filled_array(
-    buffer::ArrayBuffer{<:Vector}, value, template::AbstractArray, axes...
-)
+function get_filled_array(buffer::ArrayBuffer, value, template::AbstractArray, axes...)
     return fill!(get_array(buffer, template, axes...), value)
 end
 
 function get_feature_array(::Nothing, X::AbstractMatrix, feature::Integer)
     return @inbounds(X[feature, :])
 end
-function get_feature_array(
-    buffer::ArrayBuffer{<:AbstractMatrix}, X::AbstractMatrix, feature::Integer
-)
-    i = next_index!(buffer)
-    @inbounds buffer.array[i, :] .= X[feature, :]
-    return @view(buffer.array[i, :])
-end
-function get_feature_array(
-    buffer::ArrayBuffer{<:Vector}, X::AbstractMatrix, feature::Integer
-)
+function get_feature_array(buffer::ArrayBuffer, X::AbstractMatrix, feature::Integer)
     out = get_array(buffer, X, axes(X, 2))
     @inbounds copyto!(out, @view(X[feature, :]))
     return out
 end
 
-@inline first_feature_index(X::AbstractArray, feature::Integer) =
-    firstindex(X) + feature - firstindex(X, 1)
+# Kernels read features without bounds checks, so check each feature row once here.
+@inline function first_feature_index(X::AbstractArray, feature::Integer)
+    checkbounds(X, feature, :)
+    return firstindex(X) + feature - firstindex(X, 1)
+end
 
 @inline feature_at(X, input_index, feature, j, ::IndexLinear) = @inbounds X[input_index]
 @inline feature_at(X, input_index, feature, j, _) = @inbounds X[feature, j]
@@ -148,15 +133,13 @@ This holds evaluation policy and call-scoped mutable state.
 
 - `turbo::Val{T}=Val(false)`: If `Val{true}`, use LoopVectorization.jl for faster
     evaluation.
-- `bumper::Val{B}=Val(false)`: If `Val{true}`, use Bumper.jl for faster evaluation.
+- `bumper::Val{B}=Val(false)`: Deprecated; has no effect.
 - `early_exit::Val{E}=Val(true)`: If `Val{true}`, any element of any step becoming
     `NaN` or `Inf` will terminate the computation. For `eval_tree_array`, this will
     result in the second return value, the completion flag, being `false`. For 
     calling an expression using `tree(X)`, this fills the entire buffer with
     `invalid_value(T)`, which defaults to NaN for floating-point types.
-    Setting `Val{false}` disables early termination. Unary fused kernels still
-    propagate invalid intermediates without calling the outer operator; use
-    `use_fused=false` if that operator should recover invalid values.
+    Setting `Val{false}` disables early termination.
 - `buffer::Union{ArrayBuffer,Nothing}`: If not `nothing`, use this buffer for evaluation.
     This should be an instance of `ArrayBuffer` which has an `array` field and an
     `index` field used to iterate which buffer slot to use. The buffer creator must
@@ -195,10 +178,6 @@ end
     v_bumper = _to_bool_val(bumper)
     v_early_exit = _to_bool_val(early_exit)
     v_use_fused = _to_bool_val(use_fused)
-
-    if v_bumper isa Val{true}
-        @assert buffer === nothing
-    end
 
     return EvalContext(v_turbo, v_bumper, v_early_exit, buffer, v_use_fused, unary_cache)
 end
@@ -308,21 +287,12 @@ function eval_tree_array(
     _deprecated_kws...,
 ) where {T}
     _eval_context = _process_deprecated_kws(eval_context, _deprecated_kws)
-    if _eval_context.turbo isa Val{true} || _eval_context.bumper isa Val{true}
+    if _eval_context.turbo isa Val{true}
         @assert T in (Float32, Float64)
     end
     if _eval_context.turbo isa Val{true}
         _is_loopvectorization_loaded(0) ||
             error("Please load the LoopVectorization.jl package to use this feature.")
-    end
-    if (_eval_context.turbo isa Val{true} || _eval_context.bumper isa Val{true}) &&
-        !(T <: Number)
-        error(
-            "Bumper and LoopVectorization features are only compatible with numeric element types",
-        )
-    end
-    if _eval_context.bumper isa Val{true}
-        return bumper_eval_tree_array(tree, cX, operators, _eval_context)
     end
 
     result = _eval_tree_array(tree, cX, operators, _eval_context)
@@ -420,9 +390,11 @@ function deg0_eval(
 )::ResultOk where {T}
     if tree.constant
         return ResultOk(
-            get_filled_array(eval_context.buffer, tree.val, cX, axes(cX, 2)), true
+            get_filled_array(eval_context.buffer, tree.val, cX, axes(cX, 2)),
+            eval_context.early_exit isa Val{false} || is_valid(tree.val),
         )
     else
+        checkbounds(cX, tree.feature, :)
         return ResultOk(get_feature_array(eval_context.buffer, cX, tree.feature), true)
     end
 end
@@ -783,9 +755,10 @@ function deg1_l2_ll0_lr0_eval(
     cX::AbstractMatrix{T},
     op::F,
     op_l::F2,
-    eval_context::EvalContext{false,false},
+    eval_context::EvalContext{false},
 ) where {T,F,F2}
     index_style = IndexStyle(typeof(cX))
+    early_exit = eval_context.early_exit isa Val{true}
     if get_child(get_child(tree, 1), 1).constant &&
         get_child(get_child(tree, 1), 2).constant
         val_ll = get_child(get_child(tree, 1), 1).val
@@ -807,7 +780,7 @@ function deg1_l2_ll0_lr0_eval(
         @inbounds @simd for j in axes(cX, 2)
             x_l =
                 op_l(val_ll, feature_at(cX, input_lr_index, feature_lr, j, index_style))::T
-            x = is_valid(x_l) ? op(x_l)::T : x_l
+            x = early_exit && !is_valid(x_l) ? x_l : op(x_l)::T
             cumulator[j] = x
             input_lr_index += feature_stride
         end  # COV_EXCL_LINE
@@ -822,7 +795,7 @@ function deg1_l2_ll0_lr0_eval(
         @inbounds @simd for j in axes(cX, 2)
             x_l =
                 op_l(feature_at(cX, input_ll_index, feature_ll, j, index_style), val_lr)::T
-            x = is_valid(x_l) ? op(x_l)::T : x_l
+            x = early_exit && !is_valid(x_l) ? x_l : op(x_l)::T
             cumulator[j] = x
             input_ll_index += feature_stride
         end  # COV_EXCL_LINE
@@ -839,7 +812,7 @@ function deg1_l2_ll0_lr0_eval(
                 feature_at(cX, input_ll_index, feature_ll, j, index_style),
                 feature_at(cX, input_lr_index, feature_lr, j, index_style),
             )::T
-            x = is_valid(x_l) ? op(x_l)::T : x_l
+            x = early_exit && !is_valid(x_l) ? x_l : op(x_l)::T
             cumulator[j] = x
             input_ll_index += feature_stride
             input_lr_index += feature_stride
@@ -854,9 +827,10 @@ function deg1_l1_ll0_eval(
     cX::AbstractMatrix{T},
     op::F,
     op_l::F2,
-    eval_context::EvalContext{false,false},
+    eval_context::EvalContext{false},
 ) where {T,F,F2}
     index_style = IndexStyle(typeof(cX))
+    early_exit = eval_context.early_exit isa Val{true}
     if get_child(get_child(tree, 1), 1).constant
         val_ll = get_child(get_child(tree, 1), 1).val
         @return_on_nonfinite_val(eval_context, val_ll, cX)
@@ -872,7 +846,7 @@ function deg1_l1_ll0_eval(
         cumulator = get_array(eval_context.buffer, cX, axes(cX, 2))
         @inbounds @simd for j in axes(cX, 2)
             x_l = op_l(feature_at(cX, input_ll_index, feature_ll, j, index_style))::T
-            x = is_valid(x_l) ? op(x_l)::T : x_l
+            x = early_exit && !is_valid(x_l) ? x_l : op(x_l)::T
             cumulator[j] = x
             input_ll_index += feature_stride
         end  # COV_EXCL_LINE
@@ -908,7 +882,7 @@ function deg2_branch0_eval(
     op::F,
     branch_op::F2,
     ::Val{side},
-    eval_context::EvalContext{false,false},
+    eval_context::EvalContext{false},
 ) where {T<:Number,F,F2,side}
     index_style = IndexStyle(typeof(cX))
     branch = side === :left ? get_child(tree, 1) : get_child(tree, 2)
@@ -963,7 +937,7 @@ function deg2_l0_r0_eval(
     tree::AbstractExpressionNode{T},
     cX::AbstractMatrix{T},
     op::F,
-    eval_context::EvalContext{false,false},
+    eval_context::EvalContext{false},
 ) where {T,F}
     index_style = IndexStyle(typeof(cX))
     if get_child(tree, 1).constant && get_child(tree, 2).constant
@@ -1026,7 +1000,7 @@ function deg2_l0_eval(
     cumulator::AbstractVector{T},
     cX::AbstractArray{T},
     op::F,
-    eval_context::EvalContext{false,false},
+    eval_context::EvalContext{false},
 ) where {T,F}
     index_style = IndexStyle(typeof(cX))
     if get_child(tree, 1).constant
@@ -1056,7 +1030,7 @@ function deg2_r0_eval(
     cumulator::AbstractVector{T},
     cX::AbstractArray{T},
     op::F,
-    eval_context::EvalContext{false,false},
+    eval_context::EvalContext{false},
 ) where {T,F}
     index_style = IndexStyle(typeof(cX))
     if get_child(tree, 2).constant

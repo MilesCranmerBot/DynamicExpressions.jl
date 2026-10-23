@@ -125,3 +125,74 @@
 
     #literate_end
 end
+
+@testitem "Unparameterized conversion preserves degree" begin
+    for D in (1, 3), N in (Node, GraphNode)
+        x = N{Float64,D}(; feature=1)
+        @test convert(N, x) === x
+        @test N(x) === x
+    end
+end
+
+@testitem "Right child requires left child" begin
+    x = Node{Float64}(; feature=1)
+    @test_throws ArgumentError Node{Float64}(; r=x)
+    @test_throws ArgumentError Node{Float64}(; op=1, r=x, children=(x,))
+end
+
+@testitem "set_children! rejects excess children" begin
+    x = Node{Float64}(; feature=1)
+    @test_throws ArgumentError set_children!(x, (x, x, x))
+    @test_throws ArgumentError set_children!(x, [x, x, x])
+    @test x.degree == 0
+end
+
+@testitem "Graph conversion removes sharing" begin
+    x = GraphNode{Float64}(; feature=1)
+    shared = GraphNode{Float64}(; op=1, children=(x, x))
+    t = GraphNode{Float64}(; op=1, children=(shared, shared))
+    for N in (Node, Node{Float32}, Node{Float64})
+        c = convert(N, t)
+        @test length(unique(map(objectid, c))) == length(c)
+        @test get_child(c, 1) !== get_child(c, 2)
+    end
+end
+
+@testitem "Graph node correspondence" begin
+    OperatorEnum(2 => (+, *))
+    x1, x2 = (GraphNode{Float64}(; feature=i) for i in 1:2)
+    y1, y2 = (GraphNode{Float64}(; feature=i) for i in 1:2)
+    a = GraphNode{Float64}(;
+        op=1, children=(GraphNode{Float64}(; op=2, children=(x1, x2)), x1)
+    )
+    b = GraphNode{Float64}(;
+        op=1, children=(GraphNode{Float64}(; op=2, children=(y1, y2)), y2)
+    )
+    @test !(a == b)
+    @test !(b == a)
+    @test a == copy_node(a)
+end
+
+@testitem "Equality across maximum degrees" begin
+    @test Node{Float64,1}(; feature=1) == Node{Float64,2}(; feature=1)
+    @test GraphNode{Float64,1}(; feature=1) == GraphNode{Float64,2}(; feature=1)
+    @test Node{Float64,1}(; feature=1) != Node{Float64,2}(; feature=2)
+end
+
+@testitem "Constructor degree inference" begin
+    for D in (1, 3), N in (Node, GraphNode)
+        x = N{Float64,D}(; feature=1)
+        for cs in ((x,), ntuple(_ -> x, D), [x])
+            n = N(; op=1, children=cs)
+            @test typeof(n) === typeof(x)
+            @test get_children(n, length(cs)) == Tuple(cs)
+        end
+    end
+end
+
+@testitem "Graph iteration matches length" begin
+    x = GraphNode{Float64}(; feature=1)
+    t = GraphNode{Float64}(; op=1, children=(x, x))
+    @test length([n for n in t]) == length(t)
+    @test [objectid(n) for n in t] == map(objectid, collect(t))
+end
