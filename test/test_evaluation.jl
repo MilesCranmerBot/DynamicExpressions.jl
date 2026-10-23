@@ -235,6 +235,30 @@ end
     end
 end
 
+@testitem "Invalid constant branches fail evaluation on zero samples" begin
+    using DynamicExpressions, LoopVectorization
+
+    operators = OperatorEnum(; binary_operators=[+, /])
+    for T in (Float32, Float64)
+        x1 = Node{T}(; feature=1)
+        c(v) = Node{T}(; val=v)
+        quotient(l, r) = Node(; op=2, children=(l, r))  # `/` would fold two constants
+        X = zeros(T, 1, 0)
+        for (tree, expected_ok) in (
+            (quotient(c(1), c(0)) + x1, false),
+            (x1 + quotient(c(1), c(0)), false),
+            (quotient(c(1), c(2)) + x1, true),
+        )
+            for turbo in (false, true), use_fused in (false, true)
+                eval_context = EvalContext(; turbo, use_fused)
+                result, ok = eval_tree_array(tree, X, operators; eval_context)
+                @test ok == expected_ok
+                @test size(result) == (0,)
+            end
+        end
+    end
+end
+
 @testitem "Feature indices beyond the input rows throw" begin
     using DynamicExpressions, LoopVectorization
 
