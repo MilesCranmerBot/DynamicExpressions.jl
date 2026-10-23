@@ -16,6 +16,11 @@
     graph_tree_branch_deg1 = convert(GraphNode, tree_branch_deg1)
     graph_tree_leaf_feature = convert(GraphNode, tree_leaf_feature)
     graph_tree_leaf_constant = convert(GraphNode, tree_leaf_constant)
+    graph_x1 = GraphNode{Float64}(; feature=1)
+    graph_shared_leaf = graph_x1 + graph_x1
+    graph_shared_branch = let s = sin(graph_x1)
+        s * 3.5 + s
+    end
 
     @test Interfaces.test(
         NodeInterface,
@@ -30,6 +35,8 @@
             graph_tree_branch_deg1,
             graph_tree_leaf_feature,
             graph_tree_leaf_constant,
+            graph_shared_leaf,
+            graph_shared_branch,
         ],
     )
 end

@@ -252,6 +252,22 @@ end
     @test result.minimum < 1e-5 && init_loss > 0.1
     @test result.minimizer.metadata.parameters ≈ true_parameters
 end
+
+@testitem "Parametric scalar setters require exact length" begin
+    using DynamicExpressions
+
+    for tree in (ParametricNode{Float64}(; feature=1), ParametricNode(; val=3.0))
+        ex = ParametricExpression(tree; operators=nothing, parameters=[10.0 20.0])
+        old, refs = get_scalar_constants(ex)
+        for x in (Float64[], old[1:(end - 1)], vcat(old, 4.0))
+            @test_throws DimensionMismatch set_scalar_constants!(ex, x, refs)
+            @test first(get_scalar_constants(ex)) == old
+        end
+        replacement = reverse(old)
+        @test set_scalar_constants!(ex, replacement, refs) === ex
+        @test first(get_scalar_constants(ex)) == replacement
+    end
+end
 @testitem "Parametric copies own mutable constant values" begin
     using DynamicExpressions
 
@@ -438,4 +454,16 @@ end
     # Gradient extractor
     @test extract_gradient(grad, ex) ≈ vcat(true_grad[3], true_grad[2][:])
     @test axes(extract_gradient(grad, ex)) == axes(first(get_scalar_constants(ex)))
+end
+
+@testitem "combine_operators! on ParametricExpression" begin
+    ex = parse_expression(
+        :((x + 1.0) + 2.0);
+        expression_type=ParametricExpression,
+        operators=OperatorEnum(2 => (+, -, *, /)),
+        variable_names=["x"],
+        parameters=zeros(1, 1),
+        parameter_names=["p"],
+    )
+    @test string_tree(combine_operators!(ex)) == "x + 3.0"
 end

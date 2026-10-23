@@ -20,6 +20,9 @@ import DynamicExpressions.ExtensionInterfaceModule: _is_loopvectorization_loaded
 
 _is_loopvectorization_loaded(::Int) = true
 
+# `@turbo` reads features without bounds checks, so check each feature row once here.
+@inline checked_feature(X, leaf) = (checkbounds(X, leaf.feature, :); leaf.feature)
+
 @generated function degn_eval(
     cumulators::NTuple{N,<:AbstractVector{T}}, op::F, ::EvalContext{true}
 )::ResultOk where {N,T,F}
@@ -54,7 +57,7 @@ function deg1_l2_ll0_lr0_eval(
     elseif get_child(get_child(tree, 1), 1).constant
         val_ll = get_child(get_child(tree, 1), 1).val
         @return_on_nonfinite_val(eval_context, val_ll, cX)
-        feature_lr = get_child(get_child(tree, 1), 2).feature
+        feature_lr = checked_feature(cX, get_child(get_child(tree, 1), 2))
         cumulator = get_array(eval_context.buffer, cX, axes(cX, 2))
         @turbo for j in axes(cX, 2)
             x_l = op_l(val_ll, cX[feature_lr, j])
@@ -63,7 +66,7 @@ function deg1_l2_ll0_lr0_eval(
         end
         return ResultOk(cumulator, true)
     elseif get_child(get_child(tree, 1), 2).constant
-        feature_ll = get_child(get_child(tree, 1), 1).feature
+        feature_ll = checked_feature(cX, get_child(get_child(tree, 1), 1))
         val_lr = get_child(get_child(tree, 1), 2).val
         @return_on_nonfinite_val(eval_context, val_lr, cX)
         cumulator = get_array(eval_context.buffer, cX, axes(cX, 2))
@@ -74,8 +77,8 @@ function deg1_l2_ll0_lr0_eval(
         end
         return ResultOk(cumulator, true)
     else
-        feature_ll = get_child(get_child(tree, 1), 1).feature
-        feature_lr = get_child(get_child(tree, 1), 2).feature
+        feature_ll = checked_feature(cX, get_child(get_child(tree, 1), 1))
+        feature_lr = checked_feature(cX, get_child(get_child(tree, 1), 2))
         cumulator = get_array(eval_context.buffer, cX, axes(cX, 2))
         @turbo for j in axes(cX, 2)
             x_l = op_l(cX[feature_ll, j], cX[feature_lr, j])
@@ -102,7 +105,7 @@ function deg1_l1_ll0_eval(
         @return_on_nonfinite_val(eval_context, x, cX)
         return ResultOk(get_filled_array(eval_context.buffer, x, cX, axes(cX, 2)), true)
     else
-        feature_ll = get_child(get_child(tree, 1), 1).feature
+        feature_ll = checked_feature(cX, get_child(get_child(tree, 1), 1))
         cumulator = get_array(eval_context.buffer, cX, axes(cX, 2))
         @turbo for j in axes(cX, 2)
             x_l = op_l(cX[feature_ll, j])
@@ -137,9 +140,9 @@ function deg2_branch0_eval(
     constant1 = leaf1.constant
     constant2 = leaf2.constant
     constant3 = leaf3.constant
-    feature1 = constant1 ? 1 : Int(leaf1.feature)
-    feature2 = constant2 ? 1 : Int(leaf2.feature)
-    feature3 = constant3 ? 1 : Int(leaf3.feature)
+    feature1 = constant1 ? 1 : Int(checked_feature(cX, leaf1))
+    feature2 = constant2 ? 1 : Int(checked_feature(cX, leaf2))
+    feature3 = constant3 ? 1 : Int(checked_feature(cX, leaf3))
     value1 = constant1 ? leaf1.val : zero(T)
     value2 = constant2 ? leaf2.val : zero(T)
     value3 = constant3 ? leaf3.val : zero(T)
@@ -197,7 +200,7 @@ function deg2_l0_r0_eval(
         cumulator = get_array(eval_context.buffer, cX, axes(cX, 2))
         val_l = get_child(tree, 1).val
         @return_on_nonfinite_val(eval_context, val_l, cX)
-        feature_r = get_child(tree, 2).feature
+        feature_r = checked_feature(cX, get_child(tree, 2))
         @turbo for j in axes(cX, 2)
             x = op(val_l, cX[feature_r, j])
             cumulator[j] = x
@@ -205,7 +208,7 @@ function deg2_l0_r0_eval(
         return ResultOk(cumulator, true)
     elseif get_child(tree, 2).constant
         cumulator = get_array(eval_context.buffer, cX, axes(cX, 2))
-        feature_l = get_child(tree, 1).feature
+        feature_l = checked_feature(cX, get_child(tree, 1))
         val_r = get_child(tree, 2).val
         @return_on_nonfinite_val(eval_context, val_r, cX)
         @turbo for j in axes(cX, 2)
@@ -215,8 +218,8 @@ function deg2_l0_r0_eval(
         return ResultOk(cumulator, true)
     else
         cumulator = get_array(eval_context.buffer, cX, axes(cX, 2))
-        feature_l = get_child(tree, 1).feature
-        feature_r = get_child(tree, 2).feature
+        feature_l = checked_feature(cX, get_child(tree, 1))
+        feature_r = checked_feature(cX, get_child(tree, 2))
         @turbo for j in axes(cX, 2)
             x = op(cX[feature_l, j], cX[feature_r, j])
             cumulator[j] = x
@@ -242,7 +245,7 @@ function deg2_l0_eval(
         end
         return ResultOk(cumulator, true)
     else
-        feature = get_child(tree, 1).feature
+        feature = checked_feature(cX, get_child(tree, 1))
         @turbo for j in eachindex(cumulator)
             x = op(cX[feature, j], cumulator[j])
             cumulator[j] = x
@@ -267,7 +270,7 @@ function deg2_r0_eval(
         end
         return ResultOk(cumulator, true)
     else
-        feature = get_child(tree, 2).feature
+        feature = checked_feature(cX, get_child(tree, 2))
         @turbo for j in eachindex(cumulator)
             x = op(cumulator[j], cX[feature, j])
             cumulator[j] = x

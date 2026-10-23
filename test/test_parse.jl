@@ -711,3 +711,21 @@ end
         @test isequal(parsed.tree.val, value)
     end
 end
+
+@testitem "StringsParse callable names survive hash collisions" begin
+    using DynamicExpressions
+    using Test
+    struct SameHashOperator <: Function
+        label::String
+    end
+    (op::SameHashOperator)(x) = x
+    Base.hash(::SameHashOperator, h::UInt) = zero(UInt)
+    Base.show(io::IO, op::SameHashOperator) = print(io, op.label)
+    tree = Node(; op=1, children=(Node(; feature=1),))
+    for label in ("f", "g", "f")
+        operators = OperatorEnum(
+            1 => (SameHashOperator(label),); define_helper_functions=false
+        )
+        @test string_tree(tree, operators) == label * "(x1)"
+    end
+end

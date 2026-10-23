@@ -407,12 +407,22 @@ end
 @inline function node_factory(
     ::Type{N}, ::Type, ::Nothing, ::Nothing, op::Integer, children::Union{Tuple,AbstractVector}, allocator::F,
 ) where {N<:AbstractExpressionNode,F}
-    T = defines_eltype(N) ? eltype(N) : promote_type(map(eltype, children)...)
+    T = if defines_eltype(N)
+        eltype(N)
+    elseif children isa AbstractVector && isconcretetype(eltype(children))
+        eltype(eltype(children))
+    else
+        promote_type(map(eltype, children)...)
+    end
     defines_eltype(N) && @assert T === promote_type(T, map(eltype, children)...)
     D2 = length(children)
-    @assert D2 <= max_degree(N)
-    NT = with_type_parameters(N, T)
-    n = allocator(N, T)
+    NT = if has_max_degree(N) || children isa Tuple{}
+        N
+    else
+        with_max_degree(N, Val(max_degree(eltype(children))))
+    end
+    @assert D2 <= max_degree(NT)
+    n = allocator(NT, T)
     n.degree = D2
     n.op = op
     set_children!(n, children)
@@ -458,14 +468,18 @@ function (::Type{N})(
     return N(; feature=i)
 end
 
-function Base.promote_rule(::Type{Node{T1,D}}, ::Type{Node{T2,D}}) where {T1,T2,D}
-    return Node{promote_type(T1, T2),D}
+function Base.promote_rule(::Type{Node{T1,D1}}, ::Type{Node{T2,D2}}) where {T1,T2,D1,D2}
+    return Node{promote_type(T1, T2),max(D1, D2)}
 end
-function Base.promote_rule(::Type{GraphNode{T1,D}}, ::Type{Node{T2,D}}) where {T1,T2,D}
-    return GraphNode{promote_type(T1, T2),D}
+function Base.promote_rule(
+    ::Type{GraphNode{T1,D1}}, ::Type{Node{T2,D2}}
+) where {T1,T2,D1,D2}
+    return GraphNode{promote_type(T1, T2),max(D1, D2)}
 end
-function Base.promote_rule(::Type{GraphNode{T1,D}}, ::Type{GraphNode{T2,D}}) where {T1,T2,D}
-    return GraphNode{promote_type(T1, T2),D}
+function Base.promote_rule(
+    ::Type{GraphNode{T1,D1}}, ::Type{GraphNode{T2,D2}}
+) where {T1,T2,D1,D2}
+    return GraphNode{promote_type(T1, T2),max(D1, D2)}
 end
 
 """

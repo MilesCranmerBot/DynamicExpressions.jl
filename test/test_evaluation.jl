@@ -211,6 +211,49 @@ end
     end
 end
 
+@testitem "Invalid constant leaves fail evaluation on zero samples" begin
+    using DynamicExpressions, LoopVectorization
+
+    operators = OperatorEnum(1 => (exp,), 2 => (+, *))
+    for T in (Float32, Float64)
+        x1 = Node{T}(; feature=1)
+        c(v) = Node{T}(; val=v)
+        X = zeros(T, 1, 0)
+        for (tree, expected_ok) in (
+            (c(NaN), false),
+            (c(NaN) + x1, false),
+            (c(Inf) * exp(x1), false),
+            (c(1) + x1, true),
+        )
+            for turbo in (false, true), use_fused in (false, true)
+                eval_context = EvalContext(; turbo, use_fused)
+                result, ok = eval_tree_array(tree, X, operators; eval_context)
+                @test ok == expected_ok
+                @test size(result) == (0,)
+            end
+        end
+    end
+end
+
+@testitem "Feature indices beyond the input rows throw" begin
+    using DynamicExpressions, LoopVectorization
+
+    operators = OperatorEnum(1 => (exp,), 2 => (+,))
+    x3 = Node{Float64}(; feature=3)
+    X = [1.0 2.0 3.0; 4.0 5.0 6.0]
+    for tree in (
+        x3,
+        Node(; op=1, children=(x3, Node{Float64}(; val=2.0))),
+        Node(; op=1, children=(Node(; op=1, children=(x3,)),)),
+    )
+        for turbo in (false, true), use_fused in (false, true)
+            eval_context = EvalContext(; turbo, use_fused)
+            @test_throws BoundsError eval_tree_array(tree, X, operators; eval_context)
+        end
+        @test_throws BoundsError eval_tree_array(tree, [1.0, 2.0], operators)
+    end
+end
+
 @testitem "Test specific branches of evaluation" begin
     using DynamicExpressions, DynamicExpressions, LoopVectorization
     using DynamicExpressions.EvaluateModule: EvalContext

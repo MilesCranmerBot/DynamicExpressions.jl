@@ -29,6 +29,31 @@ function deprecate_varmap(variable_names, varMap, func_name)
     return variable_names
 end
 
+# Whether values of a type are immutable all the way down, so copying can share them.
+# Taken from BorrowChecker.jl's `is_static`.
+@inline function _is_static(::Type{T})::Bool where {T}
+    if isbitstype(T)
+        return true
+    elseif T isa UnionAll || T === Union{}
+        return false
+    elseif isstructtype(T) && ismutabletype(T)
+        return false
+    elseif T isa Union
+        return _is_static(T.a) && _is_static(T.b)
+    elseif !(T isa DataType)
+        return false
+    elseif Base.datatype_fieldcount(T) === nothing
+        return false
+    else
+        return all(_is_static, fieldtypes(T))
+    end
+end
+_is_static(::Type{<:Type}) = true
+_is_static(::Type{Symbol}) = true
+_is_static(::Type{String}) = true
+_is_static(::Type{Module}) = true
+_is_static(::T) where {T} = _is_static(T)
+
 # These are marked unstable due to issues discussed on
 # https://github.com/JuliaLang/julia/issues/55147
 @unstable counttuple(::Type{<:NTuple{N,Any}}) where {N} = N

@@ -5,7 +5,7 @@ using DispatchDoctor: @unstable
 
 using ..NodeModule: AbstractExpressionNode, Node
 using ..OperatorEnumModule: AbstractOperatorEnum, OperatorEnum
-using ..UtilsModule: Undefined
+using ..UtilsModule: Undefined, _is_static
 using ..ChainRulesModule: NodeTangent
 
 import ..NodeModule:
@@ -26,7 +26,7 @@ import ..EvaluateDerivativeModule: eval_grad_tree_array
 import ..EvaluationHelpersModule: _grad_evaluator
 import ..StringsModule: string_tree, print_tree
 import ..ChainRulesModule: extract_gradient
-import ..SimplifyModule: combine_operators, simplify_tree!
+import ..SimplifyModule: combine_operators!, simplify_tree!
 
 """A wrapper for a named tuple to avoid piracy."""
 struct Metadata{NT<:NamedTuple}
@@ -39,9 +39,11 @@ Base.propertynames(x::Metadata) = propertynames(unpack_metadata(x))
     return getproperty(unpack_metadata(x), f)
 end
 Base.show(io::IO, x::Metadata) = print(io, "Metadata(", unpack_metadata(x), ")")
-@inline _copy(x) = copy(x)
+@inline _copy(x) = _is_static(x) ? x : deepcopy(x)
+@inline _copy(x::AbstractArray) = _is_static(eltype(x)) ? copy(x) : deepcopy(x)
+# Operators stay shared: they can hold closures over user state.
+@inline _copy(x::AbstractOperatorEnum) = x
 @inline _copy(x::NamedTuple) = copy_named_tuple(x)
-@inline _copy(::Nothing) = nothing
 @inline function copy_named_tuple(nt::NamedTuple)
     return NamedTuple{keys(nt)}(map(_copy, values(nt)))
 end
