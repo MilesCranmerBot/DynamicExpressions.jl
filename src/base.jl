@@ -449,7 +449,7 @@ end
 
 isempty(::AbstractNode) = false  # COV_EXCL_LINE
 function iterate(root::AbstractNode)
-    return (root, collect(root; break_sharing=Val(true))[(begin + 1):end])
+    return (root, collect(root)[(begin + 1):end])
 end
 @unstable iterate(::AbstractNode, stack) =
     isempty(stack) ? nothing : (popfirst!(stack), stack)
@@ -538,10 +538,8 @@ function convert(
     if N1 === N2
         return tree
     end
-    if D1 !== D2
-        throw(
-            ArgumentError("Cannot convert $N2 to $N1 because they have different degrees.")
-        )
+    if D1 < D2 && any(t -> t.degree > D1, tree)
+        throw(ArgumentError("Cannot convert $N2 to $N1: a node has degree above $D1."))
     end
     return tree_mapreduce(
         Base.Fix1(leaf_convert, N1),

@@ -355,22 +355,15 @@ end
     converted_tree_f32_d3_explicit_D = convert(Node{Float32,3}, tree_f64_d3_for_convert)
     @test typeof(converted_tree_f32_d3_explicit_D) == Node{Float32,3}
 
-    # Test that converting between nodes with different degrees throws ArgumentError
-    tree_d2 = Node{Float64,2}(; val=1.0)  # Node with max degree 2
-    tree_d3 = Node{Float64,3}(; val=1.0)  # Node with max degree 3
+    # Raising the max degree always works; lowering works only if every node fits
+    tree_d2 = Node{Float64,2}(; val=1.0)
+    x_d3 = Node{Float64,3}(; feature=1)
+    tree_d3 = Node{Float64,3}(; op=1, children=(x_d3, x_d3, x_d3))
 
+    @test convert(Node{Float64,3}, tree_d2) isa Node{Float64,3}
+    @test convert(Node{Float64,2}, Node{Float64,3}(; op=1, children=(x_d3, x_d3))) isa
+        Node{Float64,2}
     @test_throws ArgumentError convert(Node{Float64,2}, tree_d3)
-    @test_throws ArgumentError convert(Node{Float64,3}, tree_d2)
-
-    # Verify the error message contains the expected text
-    try
-        convert(Node{Float64,2}, tree_d3)
-        @test false  # Should not reach here
-    catch e
-        @test e isa ArgumentError
-        @test occursin("Cannot convert", e.msg)
-        @test occursin("because they have different degrees", e.msg)
-    end
 end
 
 @testitem "LoopVectorizationExt with N-ary (degn_eval)" tags = [:narity] begin

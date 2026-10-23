@@ -107,9 +107,19 @@ end
         operators = OperatorEnum(; binary_operators=[+, -]),
         variable_names = [:x],
     )
-    out = combine_operators(ex)
+    out = combine_operators!(ex)
     @test typeof(out) === typeof(ex)
     @test string_tree(out) == "x + 5.0"
+end
+
+@testitem "Deprecated combine_operators" begin
+    using DynamicExpressions
+
+    operators = OperatorEnum(; binary_operators=[+, -])
+    ex = @parse_expression((2.0 + x) + 3.0, operators = operators, variable_names = [:x])
+    expected = get_tree(combine_operators!(copy(ex)))
+    @test get_tree(@test_deprecated(combine_operators(copy(ex)))) == expected
+    @test @test_deprecated(combine_operators(get_tree(copy(ex)), operators)) == expected
 end
 
 @testitem "Nested repeat operators in Expression parsing" begin
@@ -385,7 +395,7 @@ end
     complex_expr = parse_expression(
         :((2.0 + x) + 3.0); operators=operators, variable_names=["x"]
     )
-    simplified_expr = combine_operators(copy(complex_expr))
+    simplified_expr = combine_operators!(copy(complex_expr))
     println("Original: ", complex_expr)
     println("Simplified: ", simplified_expr)
 
@@ -445,6 +455,59 @@ end
     new_ex2 = with_metadata(ex; operators=new_operators)
     @test get_variable_names(new_ex2, nothing) == ["x1"]
     @test get_operators(new_ex2, nothing) == new_operators
+end
+
+@testitem "Expression copy deep-copies metadata except operators" begin
+    using DynamicExpressions
+    using DynamicExpressions: get_metadata
+
+    struct Payload
+        values::Vector{Vector{Float64}}
+    end
+    weighted_add = let weights = [1.0]
+        (x, y) -> weights[1] * (x + y)
+    end
+    operators = OperatorEnum(2 => (weighted_add,); define_helper_functions=false)
+    ex = Expression(
+        Node{Float64}(; feature=1);
+        operators,
+        variable_names=["x"],
+        payload=Payload([[2.0]]),
+        state=Dict("weights" => [1.0, 2.0]),
+    )
+    copied = get_metadata(copy(ex))
+    @test copied.operators === operators
+    copied.payload.values[1][1] = 99.0
+    copied.state["weights"][1] = 99.0
+    copied.variable_names[1] = "y"
+    @test get_metadata(ex).payload.values == [[2.0]]
+    @test get_metadata(ex).state == Dict("weights" => [1.0, 2.0])
+    @test get_metadata(ex).variable_names == ["x"]
+end
+
+@testitem "Expression copy shares only immutable metadata elements" begin
+    using DynamicExpressions
+    using DynamicExpressions: get_metadata
+    using DynamicExpressions.UtilsModule: _is_static
+
+    mutable struct Counter
+        n::Int
+    end
+    operators = OperatorEnum(2 => (+,))
+    ex = Expression(
+        Node{Float64}(; feature=1);
+        operators,
+        bigs=[big"1.5"],
+        counters=[Counter(1)],
+        names=["x"],
+        tags=[:a],
+    )
+    original, copied = get_metadata(ex), get_metadata(copy(ex))
+    @test copied.bigs[1] !== original.bigs[1]
+    @test copied.counters[1] !== original.counters[1]
+    @test copied.names !== original.names && copied.tags !== original.tags
+    @test _is_static(String) && _is_static(Symbol)
+    @test !_is_static(BigFloat) && !_is_static(Counter)
 end
 
 @testitem "New binary operators" begin
