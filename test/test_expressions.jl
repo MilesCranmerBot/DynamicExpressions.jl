@@ -488,7 +488,7 @@ end
 @testitem "Expression copy shares only immutable metadata elements" begin
     using DynamicExpressions
     using DynamicExpressions: get_metadata
-    using DynamicExpressions.ExpressionModule: _is_static
+    using DynamicExpressions.UtilsModule: _is_static
 
     mutable struct Counter
         n::Int
