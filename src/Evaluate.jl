@@ -809,11 +809,10 @@ function deg2_branch0_eval(
         return ResultOk(get_array(eval_context.buffer, cX, axes(cX, 2)), false)
     elseif eval_context.early_exit isa Val{true} && leaf3.constant && !is_valid(leaf3.val)
         return ResultOk(get_array(eval_context.buffer, cX, axes(cX, 2)), false)
-    elseif eval_context.early_exit isa Val{true} &&
-        get_child(branch, 1).constant &&
-        get_child(branch, 2).constant &&
-        !is_valid(branch_op(get_child(branch, 1).val, get_child(branch, 2).val)::T)
-        return ResultOk(get_array(eval_context.buffer, cX, axes(cX, 2)), false)
+    end
+    if get_child(branch, 1).constant && get_child(branch, 2).constant
+        val_branch = branch_op(get_child(branch, 1).val, get_child(branch, 2).val)::T
+        @return_on_nonfinite_val(eval_context, val_branch, cX)
     end
 
     constant1 = leaf1.constant
