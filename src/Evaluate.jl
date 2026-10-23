@@ -135,7 +135,9 @@ This holds evaluation policy and call-scoped mutable state.
 - `use_fused::Val{U}=Val(true)`: If `Val{true}`, use fused kernels for faster
     evaluation. Setting this to `Val{false}` will skip the fused kernels, meaning that
     you would only need to overload `deg0_eval`, `deg1_eval` and `deg2_eval` for custom
-    evaluation.
+    evaluation. Fused kernels check only their outputs under `early_exit`, so a `NaN`
+    or `Inf` in `X` that an operator maps to a finite value (e.g., `1 / x1` at
+    `x1 = Inf`) still completes with `true`; use `Val{false}` if that matters.
 """
 struct EvalContext{T,B,E,BUF<:Union{ArrayBuffer,Nothing},U}
     turbo::Val{T}
