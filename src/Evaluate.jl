@@ -805,6 +805,14 @@ function deg2_branch0_eval(
     input2_index = first_feature_index(cX, feature2)
     input3_index = first_feature_index(cX, feature3)
     feature_stride = size(cX, 1)
+    constant1, constant2, constant3 = map(==(typemin(Int)), bounds)
+    if side === :left && constant1 && constant2
+        val_branch = branch_op(value1, value2)::T
+        @return_on_nonfinite_val(eval_context, val_branch, cX)
+    elseif side === :right && constant2 && constant3
+        val_branch = branch_op(value2, value3)::T
+        @return_on_nonfinite_val(eval_context, val_branch, cX)
+    end
     side_val = Val(side)
     early_exit = eval_context.early_exit
     @inbounds @simd for j in axes(cX, 2)
