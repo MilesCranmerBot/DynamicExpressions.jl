@@ -476,7 +476,7 @@ end
     @test DynamicExpressions.EvalOptions === EvalContext
     @test DynamicExpressions.EvalOptions() isa EvalContext
     @test EvalContext(; turbo=true, bumper=true) isa
-        DynamicExpressions.EvalOptions{true,true}
+        DynamicExpressions.EvalOptions{true,false}
 
     tree = Node{Float64}(; feature=1)
     X = randn(1, 5)
@@ -597,5 +597,32 @@ end
         @test eval_tree_array(
             tree, X, operators; eval_context=EvalContext(; turbo, bumper=true)
         ) == expected
+    end
+end
+
+@testitem "bumper=true dispatches to custom fused kernels like bumper=false" begin
+    using DynamicExpressions
+    using DynamicExpressions.UtilsModule: ResultOk
+
+    struct BatchOnly end
+    (::BatchOnly)(x, y) = error("generic scalar kernel used instead of the custom method")
+    function DynamicExpressions.EvaluateModule.deg2_l0_r0_eval(
+        tree::AbstractExpressionNode{T},
+        cX::AbstractMatrix{T},
+        ::BatchOnly,
+        ::EvalContext{false,false},
+    ) where {T}
+        l, r = get_child(tree, 1).feature, get_child(tree, 2).feature
+        return ResultOk(cX[l, :] .+ cX[r, :], true)
+    end
+
+    operators = OperatorEnum(1 => (), 2 => (BatchOnly(),))
+    tree = Node{Float64}(;
+        op=1, children=(Node{Float64}(; feature=1), Node{Float64}(; feature=2))
+    )
+    X = [1.0 2.0; 10.0 20.0]
+    for bumper in (false, true)
+        @test eval_tree_array(tree, X, operators; eval_context=EvalContext(; bumper)) ==
+            ([11.0, 22.0], true)
     end
 end
