@@ -764,9 +764,10 @@ end
     end
 end
 
-# Each leaf picks its constant by comparing the row index with a bound (`typemin` for a
-# constant, `typemax` for a feature) computed out of line, so LLVM cannot turn the test back
-# into the loop-invariant `leaf.constant` and unswitch the loop into one vectorized copy per
+# Each leaf picks its constant by comparing the sample's offset from the first sample (always
+# in `0:(n - 1)`, whatever the matrix's axes) with a bound (`-1` for a constant, `typemax`
+# for a feature) computed out of line, so LLVM cannot turn the test back into the
+# loop-invariant `leaf.constant` and unswitch the loop into one vectorized copy per
 # combination of leaf kinds, which multiplies the compile time of every operator pair.
 # Feature indices are `Int` because a `Union{Int,UInt16}` index is split inside the loop
 # and unswitched the same way.
@@ -782,7 +783,7 @@ end
     ok = !(early_exit && any(leaf -> leaf.constant && !is_valid(leaf.val), leaves))
     features = map(leaf -> leaf.constant ? 1 : Int(leaf.feature), leaves)
     values = map(leaf -> leaf.constant ? leaf.val : zero(T), leaves)
-    bounds = map(leaf -> leaf.constant ? typemin(Int) : typemax(Int), leaves)
+    bounds = map(leaf -> leaf.constant ? -1 : typemax(Int), leaves)
     return ok, features, values, bounds
 end
 
@@ -805,7 +806,7 @@ function deg2_branch0_eval(
     input2_index = first_feature_index(cX, feature2)
     input3_index = first_feature_index(cX, feature3)
     feature_stride = size(cX, 1)
-    constant1, constant2, constant3 = map(==(typemin(Int)), bounds)
+    constant1, constant2, constant3 = map(==(-1), bounds)
     if side === :left && constant1 && constant2
         val_branch = branch_op(value1, value2)::T
         @return_on_nonfinite_val(eval_context, val_branch, cX)
@@ -815,15 +816,17 @@ function deg2_branch0_eval(
     end
     side_val = Val(side)
     early_exit = eval_context.early_exit
+    first_sample = first(axes(cX, 2))
     @inbounds @simd for j in axes(cX, 2)
+        offset = j - first_sample
         x1 = ifelse(
-            j > bound1, value1, feature_at(cX, input1_index, feature1, j, index_style)
+            offset > bound1, value1, feature_at(cX, input1_index, feature1, j, index_style)
         )
         x2 = ifelse(
-            j > bound2, value2, feature_at(cX, input2_index, feature2, j, index_style)
+            offset > bound2, value2, feature_at(cX, input2_index, feature2, j, index_style)
         )
         x3 = ifelse(
-            j > bound3, value3, feature_at(cX, input3_index, feature3, j, index_style)
+            offset > bound3, value3, feature_at(cX, input3_index, feature3, j, index_style)
         )
         cumulator[j] = _fused_binary3(op, branch_op, x1, x2, x3, side_val, early_exit)
         input1_index += feature_stride
