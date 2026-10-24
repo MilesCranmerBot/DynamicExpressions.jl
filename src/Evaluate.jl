@@ -155,11 +155,10 @@ end
     use_fused::Union{Bool,Val}=Val(true),
 )
     v_turbo = _to_bool_val(turbo)
-    v_bumper = _to_bool_val(bumper)
     v_early_exit = _to_bool_val(early_exit)
     v_use_fused = _to_bool_val(use_fused)
 
-    return EvalContext(v_turbo, v_bumper, v_early_exit, buffer, v_use_fused)
+    return EvalContext(v_turbo, Val(false), v_early_exit, buffer, v_use_fused)
 end
 
 Base.@deprecate_binding EvalOptions EvalContext
