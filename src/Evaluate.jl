@@ -337,8 +337,6 @@ function degn_eval(
     return ResultOk(cumulator_1, true)
 end
 
-# Not inlined, so each operator set's dispatcher calls the cached loop instead of compiling
-# its own copy.
 @noinline function deg2_eval(
     cumulator_l::AbstractVector{T},
     cumulator_r::AbstractVector{T},
@@ -389,9 +387,6 @@ end
     return Core.Compiler.return_type(deg0_eval, typeof((tree, cX, eval_context)))
 end
 
-# Statements for a generated body that evaluate `child` into `result` and return early when
-# it fails or is not finite. Built by a function, not a macro, so that lowering a generated
-# body, which happens for every new operator set, expands no macros.
 function eval_child_expr(result::Symbol, child)
     return quote
         $result = _eval_tree_array($child, cX, operators, eval_context)
@@ -473,8 +468,6 @@ end
             deg2_eval(result_l.x, result_r.x, operators.binops[op_idx], eval_context)
         end
     end
-    # The fusion checks do not depend on the operator, so they run once and each branch over
-    # operators is a single call; a new operator set then compiles only these calls.
     return quote
         fused = use_fused(eval_context)
         binops = operators.binops
@@ -573,7 +566,6 @@ end
             deg1_eval(result.x, operators.unaops[op_idx], eval_context)
         end
     end
-    # As in `dispatch_deg2_eval`, the fusion checks run once outside the operator branches.
     return quote
         fused = use_fused(eval_context)
         unaops = operators.unaops
@@ -764,13 +756,6 @@ end
     end
 end
 
-# Each leaf picks its constant by comparing the sample's offset from the first sample (always
-# in `0:(n - 1)`, whatever the matrix's axes) with a bound (`-1` for a constant, `typemax`
-# for a feature) computed out of line, so LLVM cannot turn the test back into the
-# loop-invariant `leaf.constant` and unswitch the loop into one vectorized copy per
-# combination of leaf kinds, which multiplies the compile time of every operator pair.
-# Feature indices are `Int` because a `Union{Int,UInt16}` index is split inside the loop
-# and unswitched the same way.
 @noinline function branch0_leaves(
     tree::AbstractExpressionNode{T}, ::Val{side}, ::Val{early_exit}
 ) where {T,side,early_exit}

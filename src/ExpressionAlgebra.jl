@@ -9,9 +9,6 @@ using ..ExpressionModule:
     with_contents,
     constructorof
 
-# The `@nospecialize` + `@inline` methods below keep precise inference for typed callers
-# (which inline them), while calls from untyped code reuse one precompiled method
-# instead of compiling a specialization for every operator set.
 @inline function insert_operator_index(
     op::Integer,
     @nospecialize(exprs::Tuple),
@@ -145,8 +142,6 @@ of arguments the operator takes.
 macro declare_expression_operator(op, arity)
     syms = [Symbol('x', i) for i in 1:arity]
     AE = :($(AbstractExpression))
-    # Untyped calls reuse one precompiled method per wrapper; typed callers inline the
-    # wrapper so that `apply_operator` is inferred and compiled for their concrete types.
     macrocall(name, arg) = Expr(:macrocall, GlobalRef(Base, name), __source__, arg)
     nospecialize(arg) = macrocall(Symbol("@nospecialize"), arg)
     inline(fn) = macrocall(Symbol("@inline"), fn)

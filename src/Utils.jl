@@ -62,9 +62,7 @@ _is_static(::T) where {T} = _is_static(T)
     nif_expr(n, index, branch)
 
 Build the expression of `Base.Cartesian.@nif(n, i -> i == index, branch)`, where
-`branch(i)` returns the expression for `i`. Generated functions use this rather than the
-macro: their bodies are lowered for every new specialization, and lowering a macro call
-compiles that macro in every session.
+`branch(i)` returns the expression for `i`.
 """
 function nif_expr(n::Integer, index::Symbol, branch::F) where {F}
     ex = branch(n)

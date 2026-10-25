@@ -24,8 +24,6 @@ function dispatch_op_name(
     return collect((pretty ? get_pretty_op_name(op) : get_op_name(op))::String)
 end
 
-# Names are looked up once per distinct operator, since the lookup is dynamically
-# dispatched to avoid compiling it for every operator set.
 struct OpNameDispatcher{D} <: Function
     operators::Union{AbstractOperatorEnum,Nothing}
     pretty::Bool

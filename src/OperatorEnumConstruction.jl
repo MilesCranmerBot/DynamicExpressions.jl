@@ -287,7 +287,6 @@ function _extend_operators_impl(
         if empty_old_operators
             foreach(empty!, values(LATEST_OPERATOR_MAPPING))
         end
-        # Index loops over `Any`-typed values so that this compiles once for all operator sets
         all_ops = getfield(operators, :ops)::Tuple
         for degree in 1:length(all_ops)
             op_tuple = all_ops[degree]::Tuple

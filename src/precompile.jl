@@ -148,10 +148,8 @@ function test_operator_enum_construction(unary_operators, binary_operators)
     latest_operators_type = LATEST_OPERATORS_TYPE.x
     mapping = Dict(k => copy(v) for (k, v) in LATEST_OPERATOR_MAPPING)
 
-    # Hide the argument types, as user calls will dispatch at runtime too
     pairs = Base.inferencebarrier((1 => unary_operators, 2 => binary_operators))
     OperatorEnum(pairs...)
-    # Helper functions would define new methods for `GenericOperatorEnum`, so skip them
     GenericOperatorEnum(pairs...; define_helper_functions=false)
     precompile(GenericOperatorEnum, map(typeof, pairs))
 
@@ -168,8 +166,6 @@ end
 
 """
 Precompile the runtime-dispatched calls that record operators in the global mappings.
-`@compile_workload` misses these because the predefined operators are extended first,
-outside any workload.
 """
 function precompile_operator_mappings()
     (; ALREADY_DEFINED_OPERATORS, OP_FIELDTYPE) = OperatorEnumConstructionModule
@@ -183,17 +179,13 @@ function precompile_operator_mappings()
 end
 
 """
-Precompile the macros still used in generated function bodies outside evaluation and
-printing, such as the derivative evaluators. A body is lowered whenever it is specialized,
-but lowering is not inferred code, so no workload caches these macros. The vararg `@nif`
-and `@ncall` are left out because the package image keeps no native code for them.
+Precompile the macros still used in generated function bodies, such as the derivative
+evaluators.
 """
 function precompile_generated_function_macros()
     C = Base.Cartesian
     precompile(C.var"@nexprs", (LineNumberNode, Module, Int, Expr))
     precompile(C.var"@ntuple", (LineNumberNode, Module, Int, Any))
-    # The macros pass quoted names, such as the field in `x_i.y`, through this internal, so
-    # the hint is skipped if a Julia version changes it.
     if isdefined(C, :lreplace!) && isdefined(C, :LReplace) && C.LReplace isa UnionAll
         precompile(C.lreplace!, (QuoteNode, C.LReplace{String}))
     end
@@ -201,8 +193,6 @@ function precompile_generated_function_macros()
 end
 
 function test_functions_on_expressions(::Type{T}, operators) where {T}
-    # Users call these from untyped code, so precompile the dynamically dispatched methods
-    # rather than versions inlined into this function.
     variable_names = ["x1", "x2"]
     x1 = Base.inferencebarrier(Expression(Node{T}(; feature=1); operators, variable_names))
     x2 = Base.inferencebarrier(Expression(Node{T}(; feature=2); operators, variable_names))
