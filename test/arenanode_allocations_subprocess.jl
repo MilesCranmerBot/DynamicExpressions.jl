@@ -8,8 +8,6 @@ using Preferences: load_preference
 
 @test load_preference(DynamicExpressions, "dispatch_doctor_mode") == "disable"
 
-# `Vararg{Any,N}` forces specialization; with plain `args...` the call is dynamic, and on
-# Julia 1.10 the returned `ArenaNode` (an immutable holding a reference) is then boxed.
 function allocations(f::F, args::Vararg{Any,N}) where {F,N}
     f(args...)
     return @allocated f(args...)

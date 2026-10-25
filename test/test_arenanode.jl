@@ -285,7 +285,6 @@ end
     using DynamicExpressions: ArenaNode
     using Random: MersenneTwister
 
-    # One case per rewrite rule; each folds its two constants into one.
     rule_cases = map(
         get_tree,
         [
@@ -381,8 +380,6 @@ end
     using DynamicExpressions
     using PerformanceTestTools: PerformanceTestTools
 
-    # The suite's DispatchDoctor checks allocate at runtime, so measure in a fresh
-    # process that has them disabled, as users do.
     prefs_env = mktempdir()
     write(
         joinpath(prefs_env, "Project.toml"),
@@ -694,7 +691,6 @@ end
     tree_gen = map(get_tree, expr_gen)
     input_gen = make_input_matrix_generator(T; n_features=N_FEATURES)
 
-    # Round-trip and read-only properties are representation-independent.
     roundtrip = @check function arena_roundtrip(tree=tree_gen)
         atree = convert(ArenaNode{T,2}, tree)
         back = convert(Node, atree)
@@ -711,8 +707,6 @@ end
     @test something(roundtrip.result) isa Supposition.Pass
 
     function evals_match(tree, atree, X)
-        # ArenaNode eval takes the same generic path as Node, so both the
-        # values and the `ok` flag must match exactly.
         yn, okn = eval_tree_array(copy(tree), X, OPERATORS)
         ya, oka = eval_tree_array(atree, X, OPERATORS)
         okn == oka || return false
@@ -725,8 +719,7 @@ end
     end
     @test something(evals.result) isa Supposition.Pass
 
-    # Valid mutations applied identically to both representations keep them
-    # equivalent. Mutations are specified positionally (preorder index).
+    # Mutations target nodes by preorder index.
     mutation_gen = map(
         (kind, i, value, op, feature) -> if kind == 1
             (:set_val, i, value)
@@ -796,8 +789,6 @@ end
     end
     @test something(mutations.result) isa Supposition.Pass
 
-    # Re-compacting after mutation (via copy) preserves the tree and re-enables
-    # the flat fast paths.
     recompact = @check function arena_copy_recompacts(
         tree0=tree_gen, X=input_gen, muts=Data.Vectors(mutation_gen; min_size=1, max_size=3)
     )

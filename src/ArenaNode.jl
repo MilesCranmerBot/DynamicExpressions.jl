@@ -76,7 +76,6 @@ this file's bulk copies and value-only updates write `arena.nodes` directly.
 mutable struct Arena{T<:Number,D} <: AbstractVector{ArenaEntry{T,D}}
     nodes::Vector{ArenaEntry{T,D}}
     compact::Bool
-    # Exact buffer length; Base pads the growth of small vectors 3-4x.
     capacity::Int
 
     function Arena{T,D}(; capacity::Integer=0) where {T,D}
@@ -84,11 +83,8 @@ mutable struct Arena{T<:Number,D} <: AbstractVector{ArenaEntry{T,D}}
     end
 end
 
-# Not `sizehint!`: on Julia 1.12 it gives a 1-entry request 3 entries and grows a
-# 23-entry vector to 72, while `Vector{E}(undef, n)` allocates exactly `n`.
 _new_nodes(::Type{E}, capacity) where {E} = resize!(Vector{E}(undef, capacity), 0)
 
-# Single-entry pushes grow geometrically; subtree appends grow to the exact size.
 function _reserve!(arena::Arena{T,D}, needed) where {T,D}
     needed <= arena.capacity && return arena
     return _grow!(arena, max(needed, arena.capacity + arena.capacity ÷ 2))
@@ -102,7 +98,6 @@ function _grow!(arena::Arena{T,D}, capacity) where {T,D}
     return arena
 end
 
-# Mark/clear the one-postfix-tree invariant (root last, no orphans):
 mark_compact!(arena::Arena) = (arena.compact = true; arena)
 invalidate_compact!(arena::Arena) = (arena.compact = false; arena)
 is_compact(arena::Arena) = arena.compact
@@ -124,8 +119,6 @@ end
 function Base.push!(arena::Arena{T,D}, entry::ArenaEntry{T,D}) where {T,D}
     _reserve!(arena, length(arena.nodes) + 1)
     nodes = arena.nodes
-    # A single leaf in a fresh arena is a valid tree; any further append breaks
-    # the one-postfix-tree invariant until a builder re-establishes it.
     isempty(nodes) || invalidate_compact!(arena)
     push!(nodes, entry)
     return arena
@@ -151,8 +144,6 @@ struct ArenaNode{T<:Number,D} <: AbstractExpressionNode{T,D}
     arena::Arena{T,D}
     idx::Int32
 
-    # Typed `arena`, so it does not overlap the generic two-argument constructors
-    # such as `(::Type{N})(op::Integer, l::AbstractExpressionNode)`.
     function ArenaNode{T,D}(arena::Arena{T,D}, idx::Integer) where {T,D}
         return new{T,D}(arena, idx)
     end
@@ -160,26 +151,18 @@ end
 
 ArenaNode(arena::Arena{T,D}, idx::Integer) where {T,D} = ArenaNode{T,D}(arena, idx)
 
-# The generic `constructorof` leaves `T` unbounded, violating `T<:Number`. Generating
-# the bounded type makes it a compile-time constant rather than a per-call allocation.
 @generated function constructorof(::Type{N}) where {N<:ArenaNode}
     return ArenaNode{T,max_degree(N)} where {T<:Number}
 end
 
-# The only sanctioned `getfield` sites: internal code uses these instead of
-# property access so that functions reachable from `getproperty` (e.g.
-# `get_child` via the `:l`/`:r` branches) do not cycle back into it.
 get_arena(node::ArenaNode) = getfield(node, :arena)
 get_index(node::ArenaNode) = getfield(node, :idx)
 
-# Entry behind a facade. A zero index is a poison facade (an unset child
-# slot); accessing it throws like reading an undefined `Node` field.
 function _load_entry(arena::Arena, idx::Int32)
     iszero(idx) && throw(UndefRefError())
     return @inbounds arena.nodes[idx]
 end
 
-# True when the arena contents *are* `tree`: compact, rooted at the last entry.
 function is_compact_root(tree::ArenaNode)
     arena = get_arena(tree)
     return is_compact(arena) && get_index(tree) == length(arena.nodes)
@@ -203,7 +186,6 @@ end
 push_constant!(arena::Arena, value) = _push_node!(arena; constant=true, val=value)
 push_feature!(arena::Arena, feature::Integer) = _push_node!(arena; feature)
 
-# Default node: a zero constant leaf in its own fresh arena.
 function ArenaNode{T,D}() where {T,D}
     arena = Arena{T,D}(; capacity=1)
     idx = push_constant!(arena, zero(T))
@@ -271,8 +253,6 @@ function _nullable_child(
     return Nullable{ArenaNode{T,D}}(iszero(child_idx), child)
 end
 
-# Children as `Nullable` wrappers; unused slots are poison nodes (like `Node`),
-# so accessing them throws an `UndefRefError`.
 @generated function unsafe_get_children(node::ArenaNode{T,D}) where {T,D}
     quote
         $(Expr(:meta, :inline))
@@ -282,17 +262,13 @@ end
 end
 
 function get_child(node::ArenaNode{T,D}, i::Int) where {T,D}
-    # Avoid routing through getproperty here: the :l/:r property branches call
-    # get_child, and the resulting inference cycle widens property access.
     arena = get_arena(node)
     entry = _load_entry(arena, get_index(node))
-    child_idx = entry.children[i]  # bounds-checked: i > D must throw, not crash
+    child_idx = entry.children[i]
     iszero(child_idx) && throw(UndefRefError())
     return ArenaNode{T,D}(arena, child_idx)
 end
 
-# Same-arena children attach by index; anything else is copied into `node`'s
-# arena, since arenas cannot link across each other.
 function _resolve_child_index!(node::ArenaNode{T,D}, child) where {T,D}
     child isa AbstractExpressionNode{T,D} || throw(
         ArgumentError(
@@ -341,10 +317,6 @@ function set_children!(
     return nothing
 end
 
-# An operator node built from children (`ArenaNode(; op, children)`) lives in
-# the arena of its first `ArenaNode` child, so that child attaches by reference
-# (as with `Node`) and only the remaining children are copied in. A custom
-# allocator keeps the generic path.
 @inline function node_factory(
     ::Type{N},
     ::Type,
@@ -372,15 +344,11 @@ function _home_arena(::Type{ArenaNode{T,D}}, children) where {T,D}
     return Arena{T,D}(; capacity=D + 1)
 end
 
-# Append `idx`'s subtree (children first, root last) to `dest`, returning the
-# root's new index. Works directly on entries, without facade traversal, so
-# copying out of a non-compact arena stays an array operation. `dest` must
-# already have room for the subtree at `cursor + 1` onward.
-# `@unstable` (here and below): DispatchDoctor's check cannot fold inside recursion.
+# `dest` must already have room for the subtree at `cursor + 1` onward.
 @unstable function _write_subtree!(
     dest::Vector{ArenaEntry{T,D}}, src::Vector{ArenaEntry{T,D}}, idx, cursor
 ) where {T,D}
-    iszero(idx) && throw(UndefRefError())  # unset child slot, like Node
+    iszero(idx) && throw(UndefRefError())
     entry = @inbounds src[idx]
     if !iszero(entry.degree)
         children = _zero_children(Val(D))
@@ -396,7 +364,7 @@ end
 end
 
 @unstable function _subtree_count(src::Vector{<:ArenaEntry}, idx)
-    iszero(idx) && throw(UndefRefError()) # unset child slot, like Node
+    iszero(idx) && throw(UndefRefError())
     entry = @inbounds src[idx]
     n = 1
     @inbounds for j in 1:(entry.degree)
@@ -405,9 +373,6 @@ end
     return n
 end
 
-# `src` may be `dest`'s own entries: reads are below the original length and
-# writes at or above `cursor`, so the regions never overlap (and `_grow!`
-# leaves the old buffer intact for reading if it reallocates).
 function _append_subtree!(
     dest::Arena{T,D}, src::Vector{ArenaEntry{T,D}}, idx, n=_subtree_count(src, idx)
 ) where {T,D}
@@ -419,7 +384,6 @@ function _append_subtree!(
     return root_idx
 end
 
-# Flat copy of a compact arena: child indices stay valid verbatim.
 function _copy_entries!(dest::Arena, src_nodes)
     _reserve!(dest, length(src_nodes))
     resize!(dest.nodes, length(src_nodes))
@@ -427,14 +391,8 @@ function _copy_entries!(dest::Arena, src_nodes)
     return mark_compact!(dest)
 end
 
-# Copies and preallocated containers leave room for one more operator node
-# with its leaves (`D + 1` entries), so one in-place edit after a copy does not
-# reallocate.
 _edit_headroom(n::Integer, ::Val{D}) where {D} = n + D + 1
 
-# Compact arenas copy as one flat array copy; otherwise the subtree is appended
-# entry-by-entry into a fresh arena, which also re-compacts. Overloads
-# `copy_node` (not `Base.copy`) since that is the generic entry point.
 function copy_node(tree::ArenaNode{T,D}; break_sharing::Val{BS}=Val(false)) where {T,D,BS}
     arena = get_arena(tree)
     if is_compact_root(tree)
@@ -449,7 +407,6 @@ function copy_node(tree::ArenaNode{T,D}; break_sharing::Val{BS}=Val(false)) wher
     return ArenaNode{T,D}(dest, idx)
 end
 
-# Preallocated arena for `copy_into!`, enabling zero-allocation copies.
 function allocate_container(
     prototype::ArenaNode{T,D}, num_nodes::Union{Nothing,Integer}=nothing
 ) where {T,D}
@@ -458,7 +415,6 @@ function allocate_container(
     )
 end
 
-# Reuses `dest`'s storage, so a copy allocates nothing once `dest` is large enough.
 function copy_into!(
     dest::Arena{T,D},
     src::ArenaNode{T,D};
@@ -466,8 +422,6 @@ function copy_into!(
 ) where {T,D}
     set_ref!(n) = ref === nothing ? nothing : (ref[] = n)
     if dest === get_arena(src)
-        # Container reuse: the tree already lives in `dest`. A compact root is
-        # a no-op; otherwise compact through a temporary copy.
         if is_compact_root(src)
             set_ref!(length(src))
             return src
@@ -490,7 +444,6 @@ function _copy_to_arena!(arena::Arena{T,D}, tree::ArenaNode{T,D}) where {T,D}
     invalidate_compact!(arena)
     return _append_subtree!(arena, get_arena(tree).nodes, get_index(tree))
 end
-# Shared subtrees are copied once per parent, since arena trees do not share.
 function _copy_to_arena!(
     arena::Arena{T,D}, tree::AbstractExpressionNode{<:Any,D}
 ) where {T,D}
@@ -512,7 +465,6 @@ function _push_branch!(arena::Arena{T,D}, branch, children::Tuple) where {T,D}
     return _push_node!(arena; degree=length(children), op=branch.op, children=padded)
 end
 
-# Copy the tree into a fresh arena, in postfix (children-first) order.
 function Base.convert(
     ::Type{ArenaNode{T,D}}, tree::AbstractExpressionNode{<:Any,D}
 ) where {T,D}
@@ -523,8 +475,6 @@ function Base.convert(
 end
 Base.convert(::Type{ArenaNode{T,D}}, tree::ArenaNode{T,D}) where {T,D} = tree
 
-# Cross-representation comparisons (`==` promotes its arguments) promote
-# toward the arena representation.
 function Base.promote_rule(::Type{ArenaNode{T1,D}}, ::Type{Node{T2,D}}) where {T1,T2,D}
     return ArenaNode{promote_type(T1, T2),D}
 end
@@ -534,15 +484,8 @@ end
 
 ################################################################################
 # Flat whole-tree operations
-#
-# For a compact arena the node array *is* the tree, so tree-wide reductions
-# become linear array scans with no pointer chasing. Each of these falls back
-# to the generic traversal-based implementation when the invariant doesn't hold.
 ################################################################################
 
-# The single iteration driver for order-free whole-tree visits.
-# `visit(node, entry)` receives the facade and the already-loaded entry, and
-# returns true to stop early (the driver then returns true).
 function _foreach_node(visit::F, tree::ArenaNode) where {F<:Function}
     arena = get_arena(tree)
     if is_compact_root(tree)
@@ -552,7 +495,6 @@ function _foreach_node(visit::F, tree::ArenaNode) where {F<:Function}
     end
 end
 
-# A compact arena is the tree, so it is walked as an array (leaves first).
 function _foreach_in_storage_order(visit::F, arena::Arena, root::Int32) where {F<:Function}
     @inbounds for i in Base.OneTo(root)
         @inline(visit(ArenaNode(arena, i), arena.nodes[i])) && return true
@@ -560,7 +502,6 @@ function _foreach_in_storage_order(visit::F, arena::Arena, root::Int32) where {F
     return false
 end
 
-# Unrolled per degree like the generic `any`, so the walk stays as fast as Node's.
 @generated function _foreach_preorder(
     visit::F, arena::Arena{T,D}, root::Int32
 ) where {F<:Function,T,D}
@@ -581,8 +522,6 @@ end
     end
 end
 
-# `val` is compared with `==` (not bitwise) to keep the -0.0 == 0.0 and
-# NaN != NaN semantics of the structural fallback.
 function _entries_equal(a::ArenaEntry, b::ArenaEntry)
     a.degree == b.degree || return false
     if iszero(a.degree)
@@ -593,8 +532,6 @@ function _entries_equal(a::ArenaEntry, b::ArenaEntry)
     end
 end
 
-# Equal compact trees have identical entry vectors (same layout, same child
-# indices), so equality is a flat field-compare.
 function Base.:(==)(a::ArenaNode{T,D}, b::ArenaNode{T,D})::Bool where {T,D}
     if is_compact_root(a) && is_compact_root(b)
         nodes_a = get_arena(a).nodes
@@ -620,9 +557,6 @@ function count_constant_nodes(tree::ArenaNode)
     return invoke(count_constant_nodes, Tuple{AbstractExpressionNode}, tree)
 end
 
-# Reads each entry once. Recursive so that `f_leaf`/`f_branch` run parent-first,
-# siblings left to right, as with Node. Sharing kwargs are ignored, since
-# ArenaNode never shares.
 function tree_mapreduce(
     f_leaf::F1,
     f_branch::F2,
@@ -670,8 +604,6 @@ function Base.any(f::F, tree::ArenaNode{T,D}) where {F<:Function,T,D}
     return _foreach_node((node, _) -> @inline(f(node)), tree)
 end
 
-# Constants as plain Int32 arena indices (also valid in flat copies). Both
-# walks visit leaves left to right, so the order matches Node's.
 function get_scalar_constants(
     tree::ArenaNode{T}, ::Type{BT}=get_number_type(T)
 ) where {T<:Number,BT}
@@ -690,8 +622,6 @@ end
 function set_scalar_constants!(
     tree::ArenaNode{T}, constants, refs::AbstractVector{Int32}
 ) where {T<:Number}
-    # Val-only writes cannot change structure, so they go to the entries
-    # directly, skipping `setindex!`'s degree/children diff.
     nodes = get_arena(tree).nodes
     @inbounds for j in eachindex(refs, constants)
         i = refs[j]
