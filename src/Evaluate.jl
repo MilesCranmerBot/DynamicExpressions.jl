@@ -800,7 +800,7 @@ end
         (get_child(tree, 1), get_child(branch, 1), get_child(branch, 2))
     end
     ok = !(early_exit && any(leaf -> leaf.constant && !is_valid(leaf.val), leaves))
-    features = map(leaf -> leaf.constant ? 1 : Int(leaf.feature), leaves)
+    features = map(leaf -> leaf.constant ? one(UInt16) : leaf.feature, leaves)
     values = map(leaf -> leaf.constant ? leaf.val : zero(T), leaves)
     bounds = map(leaf -> leaf.constant ? -1 : typemax(Int), leaves)
     return ok, features, values, bounds
